@@ -208,7 +208,7 @@ export default function AdminDashboard() {
   const fetchIssues = async () => {
     setLoading(true)
     try {
-      const res = await fetch("http://localhost:5000/issues", { signal: AbortSignal.timeout(5000) })
+      const res = await fetch("https://fixcity-0wi0.onrender.com/issues", { signal: AbortSignal.timeout(5000) })
       if (!res.ok) throw new Error()
       setIssues(await res.json())
     } catch { setIssues([]) }
@@ -220,7 +220,7 @@ export default function AdminDashboard() {
     const prev = issues.map(i => ({...i}))
     setUpdatingId(id)
     try {
-      const res = await fetch(`http://localhost:5000/issues/${id}/status`, {
+      const res = await fetch(`https://fixcity-0wi0.onrender.com/issues/${id}/status`, {
         method:"PATCH", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ status: newStatus }),
       })
@@ -454,8 +454,8 @@ export default function AdminDashboard() {
                         {/* Image */}
                         <td className="px-5 py-4">
                           {issue.image ? (
-                            <a href={`http://localhost:5000/uploads/${issue.image}`} target="_blank" rel="noreferrer">
-                              <img src={`http://localhost:5000/uploads/${issue.image}`} alt="Issue"
+                            <a href={`https://fixcity-0wi0.onrender.com/uploads/${issue.image}`} target="_blank" rel="noreferrer">
+                              <img src={`https://fixcity-0wi0.onrender.com/uploads/${issue.image}`} alt="Issue"
                                 className="w-14 h-14 rounded-xl object-cover border border-slate-200 hover:scale-110 transition-transform shadow-sm" />
                             </a>
                           ) : (
@@ -541,7 +541,7 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-500 mb-1">📍 {issue.location}</p>
                         <p className="text-xs mb-1">Priority: <strong style={{color:issue.priority==="Critical"?"#dc2626":issue.priority==="Moderate"?"#d97706":"#16a34a"}}>{issue.priority}</strong></p>
                         <p className="text-xs mb-2">Status: <strong>{issue.status}</strong></p>
-                        {issue.image && <img src={`http://localhost:5000/uploads/${issue.image}`} alt="Issue" className="w-full rounded-lg" />}
+                        {issue.image && <img src={`https://fixcity-0wi0.onrender.com/uploads/${issue.image}`} alt="Issue" className="w-full rounded-lg" />}
                       </div>
                     </Popup>
                   </Marker>

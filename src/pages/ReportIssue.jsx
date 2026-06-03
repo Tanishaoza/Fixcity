@@ -557,7 +557,7 @@ export default function ReportIssue() {
 
     try {
       setAiAnalysing(true);
-      const response = await fetch("http://localhost:5000/analyze", {
+      const response = await fetch("https://fixcity-0wi0.onrender.com/analyze", {
   method: "POST",
   body: formData,
 });
@@ -638,7 +638,7 @@ export default function ReportIssue() {
       formData.append("severity", aiResult?.severity || "");
       formData.append("priority", aiResult?.priority || "");
 
-      const response = await fetch("http://localhost:5000/submit", {
+      const response = await fetch("https://fixcity-0wi0.onrender.com/submit", {
         method: "POST",
         body: formData,
         signal: AbortSignal.timeout(6000),

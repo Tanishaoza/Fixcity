@@ -138,20 +138,20 @@ export default function AuthPage() {
     let body = {}
 
     if (mode === "signup") {
-      url = "http://localhost:5000/auth/signup"
+      url = "https://fixcity-0wi0.onrender.com/auth/signup"
       body = {
         name: form.name,
         email: form.email,
         password: form.password,
       }
     } else if (mode === "login" && role === "admin") {
-      url = "http://localhost:5000/admin/login"
+      url = "https://fixcity-0wi0.onrender.com/admin/login"
       body = {
         email: form.email,
         password: form.password,
       }
     } else {
-      url = "http://localhost:5000/auth/login"
+      url = "https://fixcity-0wi0.onrender.com/auth/login"
       body = {
         email: form.email,
         password: form.password,

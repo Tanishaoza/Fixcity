@@ -356,7 +356,7 @@ export default function Dashboard() {
     try {
       console.log("Logged in user:", user);
 console.log("Email:", user.email);
-      const res = await fetch(`http://localhost:5000/history/${user.email}`, {
+      const res = await fetch(`https://fixcity-0wi0.onrender.com/history/${user.email}`, {
         headers: { Authorization: `Bearer ${userToken}` },
         signal: AbortSignal.timeout(8000),
       });
