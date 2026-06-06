@@ -53,6 +53,17 @@ const STATUS_DOT = {
   Assigned: "bg-blue-400",
   Resolved: "bg-emerald-400",
 };
+const AI_STATUS_BADGE = {
+  Processing: "bg-purple-100 text-purple-700 border border-purple-200",
+  Completed: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+  Failed: "bg-red-100 text-red-700 border border-red-200",
+};
+
+const AI_STATUS_DOT = {
+  Processing: "bg-purple-500",
+  Completed: "bg-emerald-500",
+  Failed: "bg-red-500",
+};
 const SEVERITY_BAR = {
   High: "bg-gradient-to-r from-red-500    to-rose-400",
   Medium: "bg-gradient-to-r from-amber-500  to-yellow-400",
@@ -671,14 +682,15 @@ export default function AdminDashboard() {
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-left">
                       {[
-                        "Issue",
-                        "Location",
-                        "Image",
-                        "Reporter",
-                        "Priority",
-                        "Date",
-                        "Status",
-                      ].map((h) => (
+  "Issue",
+  "Location",
+  "Image",
+  "Reporter",
+  "Priority",
+  "AI Analysis",
+  "Date",
+  "Status",
+].map((h) => (
                         <th
                           key={h}
                           className="px-5 py-3.5 text-[11px] font-extrabold text-slate-500 uppercase tracking-widest whitespace-nowrap"
@@ -794,7 +806,36 @@ export default function AdminDashboard() {
                             {issue.priority}
                           </span>
                         </td>
+                          {/* AI Analysis */}
+<td className="px-5 py-4 max-w-[220px]">
+  <div className="flex flex-col gap-1.5">
+    <span
+      className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full w-fit ${
+        AI_STATUS_BADGE[issue.aiStatus || "Processing"] ||
+        "bg-slate-100 text-slate-600 border border-slate-200"
+      }`}
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${
+          AI_STATUS_DOT[issue.aiStatus || "Processing"] || "bg-slate-400"
+        }`}
+      />
+      AI: {issue.aiStatus || "Processing"}
+    </span>
 
+    {issue.aiConfidence > 0 && (
+      <p className="text-[10px] font-semibold text-slate-500">
+        Confidence: {issue.aiConfidence}%
+      </p>
+    )}
+
+    {issue.aiReason && (
+      <p className="text-[10px] text-slate-400 leading-snug line-clamp-2">
+        {issue.aiReason}
+      </p>
+    )}
+  </div>
+</td>
                         {/* Date */}
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-1.5 text-xs text-slate-500">
