@@ -53,7 +53,6 @@ const memoryUpload = multer({ storage: multer.memoryStorage() });
 // AI analysis route
 app.post("/analyze", memoryUpload.single("image"), async (req, res) => {
   try {
-    
     if (!req.file || !req.body.title || !req.body.description || !req.body.category) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -102,18 +101,88 @@ Return ONLY JSON:
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
     const aiResult = JSON.parse(text);
-    
+
     res.json(aiResult);
   } catch (error) {
     console.log("Gemini AI error:", error);
     res.status(500).json({ error: "AI Detection Failed" });
   }
 });
+async function analyzeIssueInBackground(issueId, imageUrl, title, description, category) {
+  try {
+    const prompt = `
+You are an AI civic issue inspector.
 
+Analyze this civic issue using the image and text.
+
+Image URL: ${imageUrl}
+Title: ${title}
+Description: ${description}
+Selected category: ${category}
+
+Return ONLY JSON:
+{
+  "category": "Pothole | Garbage | Water Leakage | Flooding | Broken Streetlight | Road Damage | Other",
+  "severity": "High | Medium | Low",
+  "priority": "Critical | Moderate | Minor",
+  "confidence": 70,
+  "reason": "short reason",
+  "detectedObjects": ["object1", "object2"]
+}
+`;
+
+    const imageResponse = await fetch(imageUrl);
+const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+
+const imageBuffer = await imageResponse.arrayBuffer();
+const base64Image = Buffer.from(imageBuffer).toString("base64");
+
+const result = await ai.models.generateContent({
+  model: "gemini-2.5-flash",
+  contents: [
+    {
+      role: "user",
+      parts: [
+        {
+          inlineData: {
+            mimeType: contentType,
+            data: base64Image,
+          },
+        },
+        { text: prompt },
+      ],
+    },
+  ],
+});
+
+    let text = result.text;
+    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+
+    const aiResult = JSON.parse(text);
+
+    await Issue.findByIdAndUpdate(issueId, {
+      category: aiResult.category,
+      severity: aiResult.severity,
+      priority: aiResult.priority,
+      aiConfidence: aiResult.confidence,
+      aiReason: aiResult.reason,
+      detectedObjects: aiResult.detectedObjects || [],
+      aiStatus: "Completed",
+    });
+
+  } catch (error) {
+    console.log("Background AI error:", error);
+
+    await Issue.findByIdAndUpdate(issueId, {
+      aiStatus: "Failed",
+    });
+  }
+}
 // Submit issue and save in MongoDB
 app.post("/submit", upload.single("image"), async (req, res) => {
   try {
     const newIssue = new Issue({
+      aiStatus: "Processing",
       issueId: "FIX" + Date.now(),
 
       name: req.body.name,
@@ -135,13 +204,26 @@ app.post("/submit", upload.single("image"), async (req, res) => {
     });
 
     await newIssue.save();
-
     res.json({
-      success: true,
-      message: "Issue saved successfully",
-      issueId: newIssue.issueId,
-      issue: newIssue,
-    });
+  success: true,
+  message: "Issue saved successfully. AI analysis is processing.",
+  issueId: newIssue.issueId,
+  issue: newIssue,
+});
+
+setImmediate(() => {
+  analyzeIssueInBackground(
+    newIssue._id,
+    newIssue.image,
+    newIssue.title,
+    newIssue.description,
+    newIssue.category
+  );
+});
+
+return;
+
+   
   } catch (error) {
     console.log("Submit error:", error);
 

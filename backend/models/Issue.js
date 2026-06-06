@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const issueSchema = new mongoose.Schema({
+const issueSchema = new mongoose.Schema(
+{
   issueId: String,
 
   name: String,
@@ -17,6 +18,26 @@ const issueSchema = new mongoose.Schema({
 
   severity: String,
   priority: String,
+
+  aiStatus: {
+    type: String,
+    default: "Processing",
+  },
+
+  aiConfidence: {
+    type: Number,
+    default: 0,
+  },
+
+  aiReason: {
+    type: String,
+    default: "",
+  },
+
+  detectedObjects: {
+    type: [String],
+    default: [],
+  },
 
   status: {
     type: String,
