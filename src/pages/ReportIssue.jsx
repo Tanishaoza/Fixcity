@@ -344,9 +344,10 @@ function AIDetectionCard({ aiResult, category, imageUploaded, aiAnalysing }) {
           <ShieldCheck size={13} className="mt-0.5 flex-shrink-0" />
           {ai && !aiAnalysing
             ? "Severity and priority automatically determined by AI using category and description analysis."
-            : active
-              ? "Fill title, category and description to activate AI analysis."
-              : "Select a category and describe the issue to activate AI analysis."}
+            : imageUploaded
+  ? "AI analysis will start automatically after you submit the report."
+  : "Upload an image and submit the report. AI will analyze it in the background."
+          }
         </div>
       </div>
     </Card>
