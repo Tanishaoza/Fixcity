@@ -454,7 +454,11 @@ export default function AdminDashboard() {
                         {/* Image */}
                         <td className="px-5 py-4">
                           {issue.image ? (
-                            <a href={`https://fixcity-0wi0.onrender.com/uploads/${issue.image}`} target="_blank" rel="noreferrer">
+                            <a
+  href={issue.image}
+  target="_blank"
+  rel="noreferrer"
+>
                               <img src={issue.image} alt="Issue"
                                 className="w-14 h-14 rounded-xl object-cover border border-slate-200 hover:scale-110 transition-transform shadow-sm" />
                             </a>
