@@ -455,7 +455,7 @@ export default function AdminDashboard() {
                         <td className="px-5 py-4">
                           {issue.image ? (
                             <a href={`https://fixcity-0wi0.onrender.com/uploads/${issue.image}`} target="_blank" rel="noreferrer">
-                              <img src={`https://fixcity-0wi0.onrender.com/uploads/${issue.image}`} alt="Issue"
+                              <img src={issue.image} alt="Issue"
                                 className="w-14 h-14 rounded-xl object-cover border border-slate-200 hover:scale-110 transition-transform shadow-sm" />
                             </a>
                           ) : (
@@ -541,7 +541,7 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-500 mb-1">📍 {issue.location}</p>
                         <p className="text-xs mb-1">Priority: <strong style={{color:issue.priority==="Critical"?"#dc2626":issue.priority==="Moderate"?"#d97706":"#16a34a"}}>{issue.priority}</strong></p>
                         <p className="text-xs mb-2">Status: <strong>{issue.status}</strong></p>
-                        {issue.image && <img src={`https://fixcity-0wi0.onrender.com/uploads/${issue.image}`} alt="Issue" className="w-full rounded-lg" />}
+                        {issue.image && <img src={issue.image} alt="Issue" className="w-full rounded-lg" />}
                       </div>
                     </Popup>
                   </Marker>

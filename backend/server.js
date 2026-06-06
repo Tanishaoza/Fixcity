@@ -1,3 +1,5 @@
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "./models/User.js";
@@ -7,9 +9,8 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import dotenv from "dotenv";
-import path from "path";
 import { GoogleGenAI } from "@google/genai";
-import fs from "fs";
+
 
 dotenv.config();
 
@@ -32,26 +33,32 @@ mongoose
   .catch((err) => console.log("❌ MongoDB Error:", err));
 
 // Upload folder
-const storage = multer.diskStorage({
-  destination: "uploads/",
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, Date.now() + ext);
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "fixcity_issues",
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
   },
 });
 
 const upload = multer({ storage });
+const memoryUpload = multer({ storage: multer.memoryStorage() });
 
 // AI analysis route
-app.post("/analyze", upload.single("image"), async (req, res) => {
+app.post("/analyze", memoryUpload.single("image"), async (req, res) => {
   try {
     
     if (!req.file || !req.body.title || !req.body.description || !req.body.category) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const imageBuffer = fs.readFileSync(req.file.path);
-    const base64Image = imageBuffer.toString("base64");
+    const base64Image = req.file.buffer.toString("base64");
 
     const prompt = `
 You are an AI civic issue inspector.
@@ -119,7 +126,7 @@ app.post("/submit", upload.single("image"), async (req, res) => {
       latitude: req.body.latitude,
       longitude: req.body.longitude,
 
-      image: req.file?.filename || "",
+      image: req.file?.path || "",
 
       severity: req.body.severity || "Medium",
       priority: req.body.priority || "Moderate",
