@@ -538,49 +538,17 @@ export default function ReportIssue() {
 
   // ── Image upload: ALWAYS preview immediately, no blocking guards ──────────
   const handleImage = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    // Always show preview instantly — no conditions
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+  setImageFile(file);
+  setImagePreview(URL.createObjectURL(file));
 
-    // Only attempt backend call if all required fields are already filled
-    if (!form.title || !form.description || !form.category) return;
-
-    // Try backend (optional) — graceful fallback if offline
-    const formData = new FormData();
-    formData.append("image", file);
-    formData.append("title", form.title);
-    formData.append("description", form.description);
-    formData.append("category", form.category);
-
-    try {
-      setAiAnalysing(true);
-      const response = await fetch("https://fixcity-0wi0.onrender.com/analyze", {
-  method: "POST",
-  body: formData,
-});
-      if (!response.ok) throw new Error("Backend error");
-      const data = await response.json();
-      console.log("FRONTEND AI RESULT:", data);
-      setAiResult({
-        category: data.category,
-        severity: data.severity,
-        priority: data.priority,
-        confidence: data.confidence,
-        detectedKeywords: data.detectedKeywords || [],
-      });
-      setForm((prev) => ({
-        ...prev,
-        category: data.category || prev.category,
-      }));
-    } catch {
-      // Backend offline — local AI result from useEffect is already set, do nothing
-    } finally {
-      setAiAnalysing(false);
-    }
-  };
+  // Do not call AI here anymore.
+  // AI will run in background after submit.
+  setAiResult(null);
+  setAiAnalysing(false);
+};
 
   const removeImage = () => {
     setImageFile(null);
@@ -635,8 +603,8 @@ export default function ReportIssue() {
       formData.append("longitude", selectedPosition?.lng || "");
       formData.append("name", form.name);
       formData.append("email", form.email);
-      formData.append("severity", aiResult?.severity || "");
-      formData.append("priority", aiResult?.priority || "");
+      formData.append("severity", "Medium");
+formData.append("priority", "Moderate");
 
       const response = await fetch("https://fixcity-0wi0.onrender.com/submit", {
         method: "POST",
@@ -920,40 +888,35 @@ export default function ReportIssue() {
 
               {/* Submit Button */}
               <button
-                type="submit"
-                disabled={loading || aiAnalysing}
-                className={`w-full py-3.5 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-2 shadow-lg transition-all duration-200
-                  ${
-                    loading || aiAnalysing
-                      ? "bg-blue-400 cursor-not-allowed shadow-blue-200"
-                      : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-300 hover:shadow-blue-400"
-                  }`}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" /> Submitting
-                    Report…
-                  </>
-                ) : aiAnalysing ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" /> AI Analysing…
-                  </>
-                ) : (
-                  <>
-                    <Zap size={18} /> Submit Report
-                  </>
-                )}
-              </button>
+  type="submit"
+  disabled={loading}
+  className={`w-full py-3.5 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-2 shadow-lg transition-all duration-200
+    ${
+      loading
+        ? "bg-blue-400 cursor-not-allowed shadow-blue-200"
+        : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-300 hover:shadow-blue-400"
+    }`}
+>
+  {loading ? (
+    <>
+      <Loader2 size={18} className="animate-spin" /> Submitting Report…
+    </>
+  ) : (
+    <>
+      <Zap size={18} /> Submit Report
+    </>
+  )}
+</button>
             </div>
 
             {/* ── Right sidebar (1/3 width) ── */}
             <div className="flex flex-col gap-6">
               <AIDetectionCard
-                aiResult={aiResult}
-                category={form.category}
-                imageUploaded={!!imageFile}
-                aiAnalysing={aiAnalysing}
-              />
+  aiResult={null}
+  category={form.category}
+  imageUploaded={!!imageFile}
+  aiAnalysing={false}
+/>
 
               <MapPreview
                 setSelectedPosition={setSelectedPosition}
