@@ -49,6 +49,49 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 const memoryUpload = multer({ storage: multer.memoryStorage() });
+// ─── SECURITY MIDDLEWARE (THE BOUNCERS) ───────────────────────────────────
+
+// Guard for Citizens / Regular Users
+const protectUser = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1]; // Grabs the token text
+
+  if (!token) {
+    return res.status(401).json({ error: "Access Denied. Please log in first." });
+  }
+
+  try {
+    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = verified; // Saves user info into the request
+    next(); // Tells Express: "ID is good, go to the next step!"
+  } catch (err) {
+    return res.status(403).json({ error: "Session expired or invalid token." });
+  }
+};
+
+// Guard for Admin Only
+const protectAdmin = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ error: "Admin Access Denied." });
+  }
+
+  try {
+    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Check if the role inside the token is actually "admin"
+    if (verified.role !== "admin") {
+      return res.status(403).json({ error: "Forbidden. You are not an admin." });
+    }
+
+    req.admin = verified;
+    next();
+  } catch (err) {
+    return res.status(403).json({ error: "Invalid Admin Session." });
+  }
+};
 
 // AI analysis route
 app.post("/analyze", memoryUpload.single("image"), async (req, res) => {
@@ -198,7 +241,7 @@ const result = await ai.models.generateContent({
   }
 }
 // Submit issue and save in MongoDB
-app.post("/submit", upload.single("image"), async (req, res) => {
+app.post("/submit", protectUser, upload.single("image"), async (req, res) => {
   try {
     const newIssue = new Issue({
       aiStatus: "Processing",
@@ -275,8 +318,8 @@ app.get("/track/:issueId", async (req, res) => {
   }
 });
 
-// Admin: get all issues
-app.get("/issues", async (req, res) => {
+
+app.get("/issues", protectAdmin, async (req, res) => {
   try {
     const issues = await Issue.find().sort({ createdAt: -1 });
     res.json(issues);
@@ -290,7 +333,8 @@ app.get("/issues", async (req, res) => {
 });
 
 // Admin: update issue status
-app.patch("/issues/:id/status", async (req, res) => {
+
+app.patch("/issues/:id/status", protectAdmin, async (req, res) => {
   try {
     
     
@@ -410,7 +454,7 @@ app.post("/admin/login", (req, res) => {
 app.get("/test", (req, res) => {
   res.json({ message: "Backend working" });
 });
-app.get("/history/:email", async (req, res) => {
+app.get("/history/:email", protectUser, async (req, res) => {
   try {
     const issues = await Issue.find({
       email: req.params.email,

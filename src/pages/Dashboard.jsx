@@ -63,10 +63,18 @@ const PRIORITY_BADGE = {
   Moderate: "bg-amber-100  text-amber-700  border border-amber-200",
   Minor: "bg-emerald-100 text-emerald-700 border border-emerald-200",
 };
+
 const SEVERITY_BAR = {
   High: "bg-gradient-to-r from-red-500    to-rose-400",
   Medium: "bg-gradient-to-r from-amber-500  to-yellow-400",
   Low: "bg-gradient-to-r from-emerald-500 to-green-400",
+};
+
+const AI_STATUS_BADGE = {
+  Processing:
+    "bg-purple-50 text-purple-700 border border-purple-200 animate-pulse",
+  Completed: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  Failed: "bg-rose-50 text-rose-700 border border-rose-200",
 };
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -179,8 +187,6 @@ function InfoRow({ icon: Icon, label, value, valueClass = "" }) {
   );
 }
 
-
-
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 const STATUS_OPTIONS = ["All", "Pending", "In Review", "Assigned", "Resolved"];
 const PROGRESS_MAP = {
@@ -196,16 +202,21 @@ function IssueTable({ issues }) {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
-              {["Issue", "Location", "Priority", "Status", "Date", "Progress"].map(
-                (head) => (
-                  <th
-                    key={head}
-                    className="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest"
-                  >
-                    {head}
-                  </th>
-                )
-              )}
+              {[
+                "Issue",
+                "Location",
+                "Priority",
+                "Status",
+                "Date",
+                "Progress",
+              ].map((head) => (
+                <th
+                  key={head}
+                  className="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest"
+                >
+                  {head}
+                </th>
+              ))}
             </tr>
           </thead>
 
@@ -226,8 +237,8 @@ function IssueTable({ issues }) {
                           issue.priority === "Critical"
                             ? "bg-red-500"
                             : issue.priority === "Moderate"
-                            ? "bg-amber-500"
-                            : "bg-emerald-500"
+                              ? "bg-amber-500"
+                              : "bg-emerald-500"
                         }`}
                       />
 
@@ -238,9 +249,22 @@ function IssueTable({ issues }) {
                         <p className="font-bold text-slate-800">
                           {issue.title}
                         </p>
-                        <p className="text-xs text-slate-400">
-                          {issue.category}
-                        </p>
+                        {issue.aiStatus === "Processing" ? (
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 mt-1 rounded-md ${AI_STATUS_BADGE.Processing}`}
+                          >
+                            🤖 AI is analyzing...
+                          </span>
+                        ) : (
+                          <p className="text-xs text-slate-400">
+                            {issue.category}
+                            {issue.verificationStatus === "Mismatch" && (
+                              <span className="ml-1.5 text-[10px] font-bold text-red-500 bg-red-50 px-1 rounded">
+                                ⚠️ Mismatch
+                              </span>
+                            )}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -268,8 +292,8 @@ function IssueTable({ issues }) {
                           issue.priority === "Critical"
                             ? "bg-red-500"
                             : issue.priority === "Moderate"
-                            ? "bg-amber-500"
-                            : "bg-emerald-500"
+                              ? "bg-amber-500"
+                              : "bg-emerald-500"
                         }`}
                       />
                       {issue.priority}
@@ -305,17 +329,36 @@ function IssueTable({ issues }) {
                   </td>
 
                   {/* Progress */}
+                  {/* Progress */}
                   <td className="px-5 py-4 min-w-[170px]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-600 rounded-full transition-all duration-500"
-                          style={{ width: `${progress}%` }}
-                        />
+                    <div className="flex flex-col items-end gap-1.5">
+                      {/* Top Row: Progress Bar and Percentage */}
+                      <div className="flex items-center gap-3 w-full">
+                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-600 rounded-full transition-all duration-500"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-bold text-blue-600">
+                          {progress}%
+                        </span>
                       </div>
-                      <span className="text-xs font-bold text-blue-600">
-                        {progress}%
-                      </span>
+                      
+                      {/* Bottom Row: AI Severity Assessment */}
+                      {issue.severity && (
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                            issue.severity === "High"
+                              ? "text-red-700 bg-red-50 border-red-100"
+                              : issue.severity === "Medium"
+                                ? "text-amber-700 bg-amber-50 border-amber-100"
+                                : "text-emerald-700 bg-emerald-50 border-emerald-100"
+                          }`}
+                        >
+                          AI Severity: {issue.severity}
+                        </span>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -327,6 +370,7 @@ function IssueTable({ issues }) {
     </div>
   );
 }
+
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -355,11 +399,14 @@ export default function Dashboard() {
     setError(false);
     try {
       console.log("Logged in user:", user);
-console.log("Email:", user.email);
-      const res = await fetch(`https://fixcity-0wi0.onrender.com/history/${user.email}`, {
-        headers: { Authorization: `Bearer ${userToken}` },
-        signal: AbortSignal.timeout(8000),
-      });
+      console.log("Email:", user.email);
+      const res = await fetch(
+        `https://fixcity-0wi0.onrender.com/history/${user.email}`,
+        {
+          headers: { Authorization: `Bearer ${userToken}` },
+          signal: AbortSignal.timeout(8000),
+        },
+      );
       if (!res.ok) throw new Error("Server error");
       const data = await res.json();
       setIssues(Array.isArray(data) ? data : []);
@@ -739,9 +786,9 @@ console.log("Email:", user.email);
           )}
 
           {/* Issue table */}
-{!loading && !error && filtered.length > 0 && (
-  <IssueTable issues={filtered} />
-)}
+          {!loading && !error && filtered.length > 0 && (
+            <IssueTable issues={filtered} />
+          )}
         </div>
 
         {/* Footer */}

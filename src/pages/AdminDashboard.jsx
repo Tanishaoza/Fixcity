@@ -309,40 +309,55 @@ export default function AdminDashboard() {
 
   const fetchIssues = async () => {
     setLoading(true);
-    setError(false);
     try {
-      const res = await fetch(`${API_BASE}/issues`, { signal: AbortSignal.timeout(8000) });
+      // 1. Grab the admin's secret token from localStorage
+      const token = localStorage.getItem("token");
+
+      const res = await fetch("https://fixcity-0wi0.onrender.com/issues", {
+        signal: AbortSignal.timeout(5000),
+        // 2. Pass the token to the backend security guard
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
       if (!res.ok) throw new Error();
       setIssues(await res.json());
     } catch {
-      setError(true);
       setIssues([]);
     } finally {
       setLoading(false);
-      setLastSync(new Date());
+      setLastRefresh(new Date());
     }
   };
 
   useEffect(() => { fetchIssues(); }, []);
 
   const handleStatusUpdate = async (id, newStatus) => {
-    const snapshot = issues.map((i) => ({ ...i }));
-    setUpdating(id);
-    // Optimistic update
-    setIssues((cur) => cur.map((i) => i._id === id ? { ...i, status: newStatus } : i));
+    const prev = issues.map((i) => ({ ...i }));
+    setUpdatingId(id);
     try {
-      const res = await fetch(`${API_BASE}/issues/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      // 1. Grab the admin's secret token from localStorage
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(
+        `https://fixcity-0wi0.onrender.com/issues/${id}/status`,
+        {
+          method: "PATCH",
+          headers: { 
+            "Content-Type": "application/json",
+            // 2. Add the token header alongside Content-Type
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: newStatus }),
+        },
+      );
       if (!res.ok) throw new Error();
       const updated = await res.json();
-      setIssues((cur) => cur.map((i) => i._id === id ? updated : i));
+      setIssues((cur) => cur.map((i) => (i._id === id ? updated : i)));
     } catch {
-      setIssues(snapshot); // rollback
+      setIssues(prev);
     } finally {
-      setUpdating(null);
+      setUpdatingId(null);
     }
   };
 
