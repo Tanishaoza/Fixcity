@@ -330,17 +330,19 @@ function IssueTable({ issues }) {
 
                   {/* Progress */}
                   {/* Progress */}
-                  <td className="px-5 py-4 min-w-[170px]">
-                    <div className="flex flex-col items-end gap-1.5">
+                  {/* Progress */}
+                  <td className="px-5 py-4 min-w-[200px]">
+                    <div className="flex flex-col items-end gap-2 w-full">
+                      
                       {/* Top Row: Progress Bar and Percentage */}
-                      <div className="flex items-center gap-3 w-full">
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="flex items-center justify-between gap-3 w-full">
+                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-blue-600 rounded-full transition-all duration-500"
                             style={{ width: `${progress}%` }}
                           />
                         </div>
-                        <span className="text-xs font-bold text-blue-600">
+                        <span className="text-xs font-bold text-blue-600 whitespace-nowrap">
                           {progress}%
                         </span>
                       </div>
@@ -348,7 +350,7 @@ function IssueTable({ issues }) {
                       {/* Bottom Row: AI Severity Assessment */}
                       {issue.severity && (
                         <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border leading-none tracking-wide uppercase ${
                             issue.severity === "High"
                               ? "text-red-700 bg-red-50 border-red-100"
                               : issue.severity === "Medium"
