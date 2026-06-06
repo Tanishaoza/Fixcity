@@ -48,6 +48,15 @@ const issueSchema = new mongoose.Schema(
     type: Date,
     default: Date.now,
   },
+  verificationStatus: {
+  type: String,
+  default: "Pending",
+},
+
+matchScore: {
+  type: Number,
+  default: 0,
+},
 },
 {
   timestamps: true,

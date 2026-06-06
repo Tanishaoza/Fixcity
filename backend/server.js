@@ -111,24 +111,37 @@ Return ONLY JSON:
 async function analyzeIssueInBackground(issueId, imageUrl, title, description, category) {
   try {
     const prompt = `
-You are an AI civic issue inspector.
+You are an AI civic issue verification inspector.
 
-Analyze this civic issue using the image and text.
+Your job is not only to classify the issue, but also to check if the user's text matches the image.
 
-Image URL: ${imageUrl}
+User submitted:
 Title: ${title}
 Description: ${description}
 Selected category: ${category}
 
-Return ONLY JSON:
+Analyze the IMAGE first, then compare it with the user's title, description, and selected category.
+
+Return ONLY valid JSON:
 {
-  "category": "Pothole | Garbage | Water Leakage | Flooding | Broken Streetlight | Road Damage | Other",
+  "category": "Pothole | Garbage | Water Leakage | Flooding | Broken Streetlight | Road Damage | Spitting | Other",
   "severity": "High | Medium | Low",
   "priority": "Critical | Moderate | Minor",
   "confidence": 70,
-  "reason": "short reason",
+  "verificationStatus": "Verified | Mismatch | Suspicious",
+  "matchScore": 0,
+  "reason": "short reason explaining whether image and text match",
   "detectedObjects": ["object1", "object2"]
 }
+
+Rules:
+1. If the image clearly shows a different issue than the user's selected category, set verificationStatus to "Mismatch".
+2. If verificationStatus is "Mismatch", confidence must be below 60.
+3. If text says pothole but image shows wall stains/spitting, category must be "Spitting" or "Other", not "Pothole".
+4. matchScore should be from 0 to 100.
+5. Only give confidence above 85 if image, title, description, and selected category all match.
+6. Do not blindly trust the selected category.
+7. Image evidence is more important than user text.
 `;
 
     const imageResponse = await fetch(imageUrl);
@@ -161,14 +174,20 @@ const result = await ai.models.generateContent({
     const aiResult = JSON.parse(text);
 
     await Issue.findByIdAndUpdate(issueId, {
-      category: aiResult.category,
-      severity: aiResult.severity,
-      priority: aiResult.priority,
-      aiConfidence: aiResult.confidence,
-      aiReason: aiResult.reason,
-      detectedObjects: aiResult.detectedObjects || [],
-      aiStatus: "Completed",
-    });
+  category: aiResult.category,
+  severity: aiResult.severity,
+  priority: aiResult.priority,
+
+  aiConfidence: aiResult.confidence,
+  aiReason: aiResult.reason,
+
+  detectedObjects: aiResult.detectedObjects || [],
+
+  verificationStatus: aiResult.verificationStatus,
+  matchScore: aiResult.matchScore,
+
+  aiStatus: "Completed",
+});
 
   } catch (error) {
     console.log("Background AI error:", error);
