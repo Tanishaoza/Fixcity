@@ -193,10 +193,11 @@ function IssueRow({ issue, onUpdate, updating }) {
             </p>
             {issue.latitude && issue.longitude && (
               <a href={`https://www.google.com/maps?q=${issue.latitude},${issue.longitude}`}
-                target="_blank" rel="noreferrer"
-                className="text-[9px] text-blue-500 hover:text-blue-700 font-bold mt-0.5 inline-block">
-                Open Maps →
-              </a>
+  target="_blank" rel="noreferrer"
+  className="text-[9px] text-blue-500 hover:text-blue-700 font-bold mt-0.5 inline-block">
+  Open Maps →
+</a>
+               
             )}
           </div>
         </div>
@@ -328,18 +329,41 @@ export default function AdminDashboard() {
     assigned: issues.filter(i => i.status==="Assigned").length,
     resolved: issues.filter(i => i.status==="Resolved").length,
   };
-
+const totalUniqueLocations = issues.length;
+  const totalRealReportsCount = issues.reduce((sum, item) => sum + (item.duplicateCount || 1), 0);
+  const totalDuplicatesLinked = Math.max(0, totalRealReportsCount - totalUniqueLocations);
+  const activeCriticalCount = issues.filter(item => item.priority === "Critical").length;
   const topAreas = Object.entries(
     issues.reduce((acc,i) => { const a=cleanArea(i.location); if(a) acc[a]=(acc[a]||0)+1; return acc; }, {})
   ).sort((a,b)=>b[1]-a[1]).slice(0,3);
 
-  const filtered = issues.filter(issue => {
-    const q = search.toLowerCase();
-    const matchStatus = statusFilter==="All" || (statusFilter==="Active"&&issue.status!=="Resolved") || issue.status===statusFilter;
-    const matchSearch = !q || [issue.issueId,issue.title,issue.category,issue.location,issue.name,issue.email].some(f=>f?.toLowerCase().includes(q));
-    return matchStatus && matchSearch;
-  });
+  // ─── CORRECT PLACEMENT SEQUENCE ───
+  // ─── OPTIMIZED FILTER PIPELINE ───
+  const uniqueSeenKeys = new Set();
 
+  const filtered = issues
+    // Step 1: Handle Search parameters and Status filters first
+    .filter(issue => {
+      const q = search.toLowerCase();
+      const matchStatus = statusFilter === "All" || (statusFilter === "Active" && issue.status !== "Resolved") || issue.status === statusFilter;
+      const matchSearch = !q || [issue.issueId, issue.title, issue.category, issue.location, issue.name, issue.email].some(f => f?.toLowerCase().includes(q));
+      return matchStatus && matchSearch;
+    })
+    // Step 2: Skip child cards explicitly marked by your database script
+    .filter(issue => issue.isDuplicate === false || !issue.isDuplicate)
+    // Step 3: Pure frontend layout fallback deduplication
+    .filter(issue => {
+      // Force strings to lowercase and clear trailing white spaces to guarantee matches
+      const cleanTitle = (issue.title || "").toLowerCase().trim();
+      const cleanLoc = (issue.location || "").toLowerCase().trim();
+      const fingerprint = `${cleanTitle}-${cleanLoc}`;
+      
+      if (uniqueSeenKeys.has(fingerprint)) {
+        return false; // Skip the row rendering block
+      }
+      uniqueSeenKeys.add(fingerprint);
+      return true;
+    });
   const resRate = stats.total > 0 ? Math.round((stats.resolved/stats.total)*100) : 0;
 
   return (
@@ -375,33 +399,40 @@ export default function AdminDashboard() {
       <main className="max-w-screen-xl mx-auto px-5 py-6 flex flex-col gap-6">
 
         {/* Banner */}
-        <div className="relative rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5 shadow-lg overflow-hidden">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2"/>
-            <div className="absolute bottom-0 left-1/3 w-32 h-32 bg-white rounded-full translate-y-1/2"/>
-          </div>
-          <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"/>
-                <span className="text-blue-200 text-[10px] font-bold tracking-widest uppercase">System Live</span>
-              </div>
-              <h1 className="text-white text-lg font-black mb-1">Welcome back, Authority 👋</h1>
-              <p className="text-blue-200 text-sm">
-                <span className="text-white font-bold">{stats.pending} pending</span> and{" "}
-                <span className="text-white font-bold">{stats.inReview} in review</span> need your attention.
-              </p>
-            </div>
-            <div className="flex gap-2.5 flex-wrap">
-              {[{label:"Total",value:stats.total,color:"text-white"},{label:"Resolved",value:stats.resolved,color:"text-emerald-300"},{label:"Pending",value:stats.pending,color:"text-amber-300"}].map(({label,value,color})=>(
-                <div key={label} className="bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-center backdrop-blur-sm">
-                  <div className={`text-2xl font-black ${color}`}>{value}</div>
-                  <div className="text-[9px] text-blue-200 font-bold uppercase tracking-widest">{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+        
+<div className="relative rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5 shadow-lg overflow-hidden">
+  <div className="absolute inset-0 opacity-10">
+    <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2"/>
+    <div className="absolute bottom-0 left-1/3 w-32 h-32 bg-white rounded-full translate-y-1/2"/>
+  </div>
+  <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <div className="flex items-center gap-2 mb-1.5">
+        <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"/>
+        <span className="text-blue-200 text-[10px] font-bold tracking-widest uppercase">System Live</span>
+      </div>
+      <h1 className="text-white text-lg font-black mb-1">Welcome back, Authority 👋</h1>
+      <p className="text-blue-200 text-sm">
+        <span className="text-white font-bold">{stats.pending} pending</span> and{" "}
+        <span className="text-white font-bold">{stats.inReview} in review</span> need your attention.
+      </p>
+    </div>
+    
+    {/* UPGRADED MATRIX ELEMENTS: Maps our new duplicate variables into cards */}
+    <div className="flex gap-2.5 flex-wrap">
+      {[
+        { label: "Total Reports", value: totalRealReportsCount, color: "text-blue-200" },
+        { label: "Unique Spots", value: totalUniqueLocations, color: "text-white" },
+        { label: "Linked Spam", value: `+${totalDuplicatesLinked}`, color: "text-amber-300" }
+      ].map(({ label, value, color }) => (
+        <div key={label} className="bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-center backdrop-blur-sm min-w-[100px]">
+          <div className={`text-2xl font-black ${color}`}>{value}</div>
+          <div className="text-[9px] text-blue-200 font-bold uppercase tracking-widest">{label}</div>
         </div>
+      ))}
+    </div>
+  </div>
+</div>
 
         {/* Stat Cards */}
         <section>
@@ -409,8 +440,16 @@ export default function AdminDashboard() {
             <BarChart3 size={12}/> Overview
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {STAT_CARDS.map(c => <StatCard key={c.key} {...c} value={stats[c.key]} total={stats.total} isTotal={c.key==="total"}/>)}
-          </div>
+  {STAT_CARDS.map(c => (
+    <StatCard 
+      key={c.key} 
+      {...c} 
+      value={c.key === "total" ? totalRealReportsCount : stats[c.key]} // <-- Use real total volume count here
+      total={totalRealReportsCount} 
+      isTotal={c.key === "total"}
+    />
+  ))}
+</div>
         </section>
 
         {/* Search + Filter */}
@@ -430,7 +469,7 @@ export default function AdminDashboard() {
             </select>
           </div>
           <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-[11px] font-semibold text-slate-500 whitespace-nowrap">
-            <TrendingUp size={12}/>{filtered.length} of {issues.length} issues
+            <TrendingUp size={12}/>{filtered.length} unique zones active
           </div>
         </div>
 
@@ -487,14 +526,14 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(issue=>(
-                      <IssueRow key={issue._id} issue={issue} onUpdate={handleStatusUpdate} updating={updatingId===issue._id}/>
-                    ))}
-                  </tbody>
+  {filtered.map(issue=>(
+    <IssueRow key={issue._id} issue={issue} onUpdate={handleStatusUpdate} updating={updatingId===issue._id}/>
+  ))}
+</tbody>
                 </table>
               </div>
               <div className="border-t border-slate-100 px-4 py-2.5 flex items-center justify-between">
-                <p className="text-[11px] text-slate-400">Showing {filtered.length} of {issues.length} issues</p>
+                <p className="text-[11px] text-slate-400">Showing {filtered.length} main row groups</p>
                 <p className="text-[11px] text-slate-400">Last synced: {lastSync.toLocaleTimeString()}</p>
               </div>
             </div>
