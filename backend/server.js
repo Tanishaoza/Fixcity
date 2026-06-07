@@ -377,9 +377,14 @@ app.patch("/issues/:id/status", protectAdmin, async (req, res) => {
 
     // Always push updates out to linked child entries matching parentIssueId
     await Issue.updateMany(
+  {
+    $or: [
       { parentIssueId: updatedIssue.issueId },
-      { status: req.body.status }
-    );
+      { issueId: updatedIssue.issueId }
+    ]
+  },
+  { status: req.body.status }
+);
 
     console.log(`🔔 [STATUS CASCADE] Main issue ${updatedIssue.issueId} and all duplicates set to: ${req.body.status}`);
     res.json(updatedIssue);
