@@ -171,6 +171,13 @@ function IssueRow({ issue, onUpdate, updating }) {
           <div className="min-w-0">
             <span className="text-[9px] font-bold text-slate-400 font-mono tracking-wider block">{issue.issueId}</span>
             <span className="text-sm font-semibold text-slate-800 group-hover:text-blue-700 transition-colors block leading-snug truncate max-w-[180px]">{issue.title}</span>
+            {issue.duplicateCount > 1 && (
+  <div className="mt-1">
+    <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 text-[9px] font-bold px-2 py-0.5 rounded-full">
+      🚨 {issue.duplicateCount} reports linked
+    </span>
+  </div>
+)}
             <span className="text-[10px] text-slate-400 block mt-0.5">{issue.category}</span>
           </div>
         </div>

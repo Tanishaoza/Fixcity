@@ -57,6 +57,18 @@ matchScore: {
   type: Number,
   default: 0,
 },
+isDuplicate: {
+  type: Boolean,
+  default: false,
+},
+parentIssueId: {
+  type: String,
+  default: "",
+},
+duplicateCount: {
+  type: Number,
+  default: 1,
+},
 },
 {
   timestamps: true,

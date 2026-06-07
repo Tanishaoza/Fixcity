@@ -240,9 +240,64 @@ const result = await ai.models.generateContent({
     });
   }
 }
+function calculateDistanceInMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth's radius in meters
+
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+async function findDuplicateIssue(newLat, newLon, category) {
+  const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+
+  // Find active, unresolved issues of the same category reported in the last 48 hours
+  const existingIssues = await Issue.find({
+    category,
+    status: { $ne: "Resolved" },
+    isDuplicate: false,
+    createdAt: { $gte: twoDaysAgo },
+  });
+
+  for (const issue of existingIssues) {
+    if (!issue.latitude || !issue.longitude) continue;
+
+    const distance = calculateDistanceInMeters(
+      Number(newLat),
+      Number(newLon),
+      Number(issue.latitude),
+      Number(issue.longitude)
+    );
+
+    // Match found if within 200 meters
+    if (distance <= 200) {
+      return issue;
+    }
+  }
+
+  return null;
+}
 // Submit issue and save in MongoDB
 app.post("/submit", protectUser, upload.single("image"), async (req, res) => {
   try {
+    // 1. Run the duplicate engine using incoming user details
+    const duplicateIssue = await findDuplicateIssue(
+      Number(req.body.latitude),
+      Number(req.body.longitude),
+      req.body.category
+    );
+
+    // 2. Build the issue document exactly per your schema parameters
     const newIssue = new Issue({
       aiStatus: "Processing",
       issueId: "FIX" + Date.now(),
@@ -263,29 +318,48 @@ app.post("/submit", protectUser, upload.single("image"), async (req, res) => {
       priority: req.body.priority || "Moderate",
 
       status: "Pending",
+
+      // Injecting the structural duplicate tracking logic here
+      isDuplicate: !!duplicateIssue,
+      parentIssueId: duplicateIssue ? duplicateIssue.issueId : "",
+      duplicateCount: 1,
     });
 
+    // 3. Save the entry to MongoDB
     await newIssue.save();
+
+    // 4. If a match was found, update the original parent issue count
+    if (duplicateIssue) {
+      await Issue.findByIdAndUpdate(duplicateIssue._id, {
+        $inc: { duplicateCount: 1 },
+      });
+    }
+
+    // 5. Send the response back cleanly to the user dashboard
     res.json({
   success: true,
-  message: "Issue saved successfully. AI analysis is processing.",
+  message: duplicateIssue
+    ? `This issue looks similar to an existing report (${duplicateIssue.issueId}). We have linked it for admin review.`
+    : "Issue saved successfully. AI analysis is processing.",
+  duplicateOf: duplicateIssue ? duplicateIssue.issueId : null,
+  isDuplicate: !!duplicateIssue,
   issueId: newIssue.issueId,
   issue: newIssue,
 });
 
-setImmediate(() => {
-  analyzeIssueInBackground(
-    newIssue._id,
-    newIssue.image,
-    newIssue.title,
-    newIssue.description,
-    newIssue.category
-  );
-});
+    // 6. Spawn the Gemini background worker to do forensic text/image matching
+    setImmediate(() => {
+      analyzeIssueInBackground(
+        newIssue._id,
+        newIssue.image,
+        newIssue.title,
+        newIssue.description,
+        newIssue.category
+      );
+    });
 
-return;
-
-   
+    return;
+    
   } catch (error) {
     console.log("Submit error:", error);
 
@@ -321,7 +395,9 @@ app.get("/track/:issueId", async (req, res) => {
 
 app.get("/issues", protectAdmin, async (req, res) => {
   try {
-    const issues = await Issue.find().sort({ createdAt: -1 });
+const issues = await Issue.find({
+  isDuplicate: false,
+}).sort({ createdAt: -1 });
     res.json(issues);
   } catch (error) {
     console.log("Fetch issues error:", error);
@@ -339,11 +415,18 @@ app.patch("/issues/:id/status", protectAdmin, async (req, res) => {
     
     
 
-    const updatedIssue = await Issue.findByIdAndUpdate(
-      req.params.id,
-      { status: req.body.status },
-      { new: true }
-    );
+   const updatedIssue = await Issue.findByIdAndUpdate(
+  req.params.id,
+  { status: req.body.status },
+  { new: true }
+);
+
+if (updatedIssue && updatedIssue.duplicateCount > 1) {
+  await Issue.updateMany(
+    { parentIssueId: updatedIssue.issueId },
+    { status: req.body.status }
+  );
+}
 
     if (!updatedIssue) {
       return res.status(404).json({ error: "Issue not found" });
