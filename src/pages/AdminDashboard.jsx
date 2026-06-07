@@ -34,7 +34,7 @@ const AI_STATUS_CONFIG = {
 };
 
 const STAT_CARDS = [
-  { label:"Total Issues", key:"total",    icon:LayoutDashboard, grad:"from-slate-700 to-slate-900",   soft:"bg-slate-50  border-slate-200",  val:"text-slate-800",  bar:"bg-slate-600"  },
+  { label:"Unique Issues", key:"total",    icon:LayoutDashboard, grad:"from-slate-700 to-slate-900",   soft:"bg-slate-50  border-slate-200",  val:"text-slate-800",  bar:"bg-slate-600"  },
   { label:"Pending",      key:"pending",  icon:Clock,           grad:"from-amber-500 to-orange-600",  soft:"bg-amber-50  border-amber-100",  val:"text-amber-700",  bar:"bg-amber-500"  },
   { label:"In Review",    key:"inReview", icon:Activity,        grad:"from-violet-500 to-purple-700", soft:"bg-violet-50 border-violet-100", val:"text-violet-700", bar:"bg-violet-500" },
   { label:"Assigned",     key:"assigned", icon:UserCheck,       grad:"from-sky-500 to-blue-700",      soft:"bg-sky-50    border-sky-100",    val:"text-sky-700",    bar:"bg-sky-500"    },
@@ -422,7 +422,7 @@ export default function AdminDashboard() {
       {[
         { label: "Total Reports", value: totalRealReportsCount, color: "text-blue-200" },
         { label: "Unique Spots", value: totalUniqueLocations, color: "text-white" },
-        { label: "Linked Spam", value: `+${totalDuplicatesLinked}`, color: "text-amber-300" }
+        { label: "Duplicate Reports", value: `+${totalDuplicatesLinked}`, color: "text-amber-300" }
       ].map(({ label, value, color }) => (
         <div key={label} className="bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-center backdrop-blur-sm min-w-[100px]">
           <div className={`text-2xl font-black ${color}`}>{value}</div>
@@ -443,7 +443,7 @@ export default function AdminDashboard() {
     <StatCard 
       key={c.key} 
       {...c} 
-      value={c.key === "total" ? totalRealReportsCount : stats[c.key]} // <-- Use real total volume count here
+      value={c.key === "total" ? totalUniqueLocations : stats[c.key]} // <-- Use real total volume count here
       total={totalRealReportsCount} 
       isTotal={c.key === "total"}
     />
