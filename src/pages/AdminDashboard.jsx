@@ -192,7 +192,7 @@ function IssueRow({ issue, onUpdate, updating }) {
               {issue.location?.startsWith("GPS") ? "Auto-detected" : issue.location || "Unavailable"}
             </p>
             {issue.latitude && issue.longitude && (
-              <a href={`http://googleusercontent.com/maps.google.com/${issue.latitude},${issue.longitude}`}
+              <a href={`https://www.google.com/maps?q=${issue.latitude},${issue.longitude}`}
   target="_blank" rel="noreferrer"
   className="text-[9px] text-blue-500 hover:text-blue-700 font-bold mt-0.5 inline-block">
   Open Maps →
@@ -330,30 +330,27 @@ export default function AdminDashboard() {
     resolved: issues.filter(i => i.status==="Resolved").length,
   };
 // ─── 1. RUN THE FILTER & DEDUPLICATION PIPELINE FIRST ───
-  const uniqueSeenKeys = new Set();
+  const filtered = issues.filter(issue => {
+  const q = search.toLowerCase();
 
-  const filtered = issues
-    // Step A: Filter out items based on Search text and Status dropdowns
-    .filter(issue => {
-      const q = search.toLowerCase();
-      const matchStatus = statusFilter === "All" || (statusFilter === "Active" && issue.status !== "Resolved") || issue.status === statusFilter;
-      const matchSearch = !q || [issue.issueId, issue.title, issue.category, issue.location, issue.name, issue.email].some(f => f?.toLowerCase().includes(q));
-      return matchStatus && matchSearch;
-    })
-    // Step B: Skip child cards explicitly marked by your database script
-    .filter(issue => issue.isDuplicate === false || !issue.isDuplicate)
-    // Step C: Frontend fallback deduplication
-    .filter(issue => {
-      const cleanTitle = (issue.title || "").toLowerCase().trim();
-      const cleanLoc = (issue.location || "").toLowerCase().trim();
-      const fingerprint = `${cleanTitle}-${cleanLoc}`;
-      
-      if (uniqueSeenKeys.has(fingerprint)) {
-        return false;
-      }
-      uniqueSeenKeys.add(fingerprint);
-      return true;
-    });
+  const matchStatus =
+    statusFilter === "All" ||
+    (statusFilter === "Active" && issue.status !== "Resolved") ||
+    issue.status === statusFilter;
+
+  const matchSearch =
+    !q ||
+    [
+      issue.issueId,
+      issue.title,
+      issue.category,
+      issue.location,
+      issue.name,
+      issue.email,
+    ].some(f => f?.toLowerCase().includes(q));
+
+  return matchStatus && matchSearch;
+});
 
   // ─── 2. CALCULATE METRICS DIRECTLY FROM WHAT IS VISIBLE ON SCREEN ───
   // This makes sure the numbers perfectly match your 1 visible row!
