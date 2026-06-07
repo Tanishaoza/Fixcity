@@ -396,7 +396,10 @@ app.get("/track/:issueId", async (req, res) => {
 app.get("/issues", protectAdmin, async (req, res) => {
   try {
 const issues = await Issue.find({
-  isDuplicate: false,
+  $or: [
+    { isDuplicate: false },
+    { isDuplicate: { $exists: false } }
+  ]
 }).sort({ createdAt: -1 });
     res.json(issues);
   } catch (error) {
