@@ -159,12 +159,7 @@ function IssueRow({ issue, onUpdate, updating }) {
   const pri   = PRIORITY_CONFIG[issue.priority] || {};
   const aiCfg = AI_STATUS_CONFIG[issue.aiStatus || "Processing"] || AI_STATUS_CONFIG.Processing;
 
-  // Verification badge config
-  const verif = {
-    Verified:   { bg:"bg-emerald-50", text:"text-emerald-700", border:"border-emerald-200", label:"✓ Verified"   },
-    Mismatch:   { bg:"bg-red-50",     text:"text-red-700",     border:"border-red-200",     label:"⚠ Mismatch"   },
-    Suspicious: { bg:"bg-amber-50",   text:"text-amber-700",   border:"border-amber-200",   label:"⚠ Suspicious" },
-  }[issue.verificationStatus];
+  
 
   return (
     <tr className="hover:bg-slate-50/60 transition-colors group border-b border-slate-100 last:border-0">
@@ -247,18 +242,14 @@ function IssueRow({ issue, onUpdate, updating }) {
             )}
           </div>
 
-          {/* Verification badge */}
-          {verif && (
-            <Badge className={`${verif.bg} ${verif.text} ${verif.border} w-fit`}>
-              {verif.label}
-            </Badge>
-          )}
+         {/* Show only mismatch */}
+{issue.verificationStatus === "Mismatch" && (
+  <Badge className="bg-red-50 text-red-700 border-red-200 w-fit">
+    ⚠ Mismatch
+  </Badge>
+)}
 
-          {/* Match score */}
-          {verif && issue.matchScore > 0 && (
-            <span className="text-[9px] text-slate-400 font-semibold">Match: {issue.matchScore}%</span>
-          )}
-
+         
         </div>
       </td>
 
