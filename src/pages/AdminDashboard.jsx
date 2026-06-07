@@ -268,13 +268,25 @@ function IssueRow({ issue, onUpdate, updating }) {
           {issue.aiConfidence > 0 && (
             <p className="text-[9px] font-semibold text-slate-500">Confidence: {issue.aiConfidence}%</p>
           )}
-          {issue.verificationStatus && issue.verificationStatus !== "Verified" && (
+          {issue.verificationStatus === "Mismatch" && (
   <Badge className="bg-red-50 text-red-700 border-red-200 w-fit">
-    ⚠ {issue.verificationStatus}
+    ⚠ Mismatch
   </Badge>
 )}
 
-{issue.matchScore > 0 && (
+{issue.verificationStatus === "Suspicious" && (
+  <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200 w-fit">
+    ⚠ Suspicious
+  </Badge>
+)}
+
+{issue.verificationStatus === "Verified" && (
+  <Badge className="bg-green-50 text-green-700 border-green-200 w-fit">
+    ✅ Verified
+  </Badge>
+)}
+
+{issue.verificationStatus !== "Pending" && issue.matchScore > 0 && (
   <p className="text-[9px] font-semibold text-slate-500">
     Match Score: {issue.matchScore}%
   </p>
