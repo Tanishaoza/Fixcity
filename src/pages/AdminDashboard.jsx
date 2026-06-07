@@ -312,7 +312,7 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       // 1. Grab the admin's secret token from localStorage
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("adminToken");
 
       const res = await fetch("https://fixcity-0wi0.onrender.com/issues", {
         signal: AbortSignal.timeout(5000),
@@ -338,7 +338,7 @@ export default function AdminDashboard() {
     setUpdatingId(id);
     try {
       // 1. Grab the admin's secret token from localStorage
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("adminToken");
 
       const res = await fetch(
         `https://fixcity-0wi0.onrender.com/issues/${id}/status`,
