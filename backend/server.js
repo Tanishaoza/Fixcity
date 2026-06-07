@@ -11,7 +11,6 @@ import multer from "multer";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 
-
 dotenv.config();
 
 const app = express();
@@ -49,12 +48,12 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 const memoryUpload = multer({ storage: multer.memoryStorage() });
+
 // ─── SECURITY MIDDLEWARE (THE BOUNCERS) ───────────────────────────────────
 
-// Guard for Citizens / Regular Users
 const protectUser = (req, res, next) => {
   const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1]; // Grabs the token text
+  const token = authHeader && authHeader.split(" ")[1];
 
   if (!token) {
     return res.status(401).json({ error: "Access Denied. Please log in first." });
@@ -62,14 +61,13 @@ const protectUser = (req, res, next) => {
 
   try {
     const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified; // Saves user info into the request
-    next(); // Tells Express: "ID is good, go to the next step!"
+    req.user = verified;
+    next();
   } catch (err) {
     return res.status(403).json({ error: "Session expired or invalid token." });
   }
 };
 
-// Guard for Admin Only
 const protectAdmin = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -81,7 +79,6 @@ const protectAdmin = (req, res, next) => {
   try {
     const verified = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Check if the role inside the token is actually "admin"
     if (verified.role !== "admin") {
       return res.status(403).json({ error: "Forbidden. You are not an admin." });
     }
@@ -93,7 +90,8 @@ const protectAdmin = (req, res, next) => {
   }
 };
 
-// AI analysis route
+// ─── AI ROUTE ────────────────────────────────────────────────────────────
+
 app.post("/analyze", memoryUpload.single("image"), async (req, res) => {
   try {
     if (!req.file || !req.body.title || !req.body.description || !req.body.category) {
@@ -104,9 +102,7 @@ app.post("/analyze", memoryUpload.single("image"), async (req, res) => {
 
     const prompt = `
 You are an AI civic issue inspector.
-
 Analyze the image and text.
-
 Title: ${req.body.title}
 Description: ${req.body.description}
 Selected category: ${req.body.category}
@@ -142,28 +138,24 @@ Return ONLY JSON:
 
     let text = result.text;
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-
     const aiResult = JSON.parse(text);
-
     res.json(aiResult);
   } catch (error) {
     console.log("Gemini AI error:", error);
     res.status(500).json({ error: "AI Detection Failed" });
   }
 });
+
 async function analyzeIssueInBackground(issueId, imageUrl, title, description, category) {
   try {
     const prompt = `
 You are an AI civic issue verification inspector.
-
 Your job is not only to classify the issue, but also to check if the user's text matches the image.
 
 User submitted:
 Title: ${title}
 Description: ${description}
 Selected category: ${category}
-
-Analyze the IMAGE first, then compare it with the user's title, description, and selected category.
 
 Return ONLY valid JSON:
 {
@@ -176,105 +168,80 @@ Return ONLY valid JSON:
   "reason": "short reason explaining whether image and text match",
   "detectedObjects": ["object1", "object2"]
 }
-
-Rules:
-1. If the image clearly shows a different issue than the user's selected category, set verificationStatus to "Mismatch".
-2. If verificationStatus is "Mismatch", confidence must be below 60.
-3. If text says pothole but image shows wall stains/spitting, category must be "Spitting" or "Other", not "Pothole".
-4. matchScore should be from 0 to 100.
-5. Only give confidence above 85 if image, title, description, and selected category all match.
-6. Do not blindly trust the selected category.
-7. Image evidence is more important than user text.
 `;
 
     const imageResponse = await fetch(imageUrl);
-const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+    const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64Image = Buffer.from(imageBuffer).toString("base64");
 
-const imageBuffer = await imageResponse.arrayBuffer();
-const base64Image = Buffer.from(imageBuffer).toString("base64");
-
-const result = await ai.models.generateContent({
-  model: "gemini-2.5-flash",
-  contents: [
-    {
-      role: "user",
-      parts: [
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
         {
-          inlineData: {
-            mimeType: contentType,
-            data: base64Image,
-          },
+          role: "user",
+          parts: [
+            {
+              inlineData: {
+                mimeType: contentType,
+                data: base64Image,
+              },
+            },
+            { text: prompt },
+          ],
         },
-        { text: prompt },
       ],
-    },
-  ],
-});
+    });
 
     let text = result.text;
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-
     const aiResult = JSON.parse(text);
 
     await Issue.findByIdAndUpdate(issueId, {
-  category: aiResult.category,
-  severity: aiResult.severity,
-  priority: aiResult.priority,
-
-  aiConfidence: aiResult.confidence,
-  aiReason: aiResult.reason,
-
-  detectedObjects: aiResult.detectedObjects || [],
-
-  verificationStatus: aiResult.verificationStatus,
-  matchScore: aiResult.matchScore,
-
-  aiStatus: "Completed",
-});
-
+      category: aiResult.category,
+      severity: aiResult.severity,
+      priority: aiResult.priority,
+      aiConfidence: aiResult.confidence,
+      aiReason: aiResult.reason,
+      detectedObjects: aiResult.detectedObjects || [],
+      verificationStatus: aiResult.verificationStatus,
+      matchScore: aiResult.matchScore,
+      aiStatus: "Completed",
+    });
   } catch (error) {
     console.log("Background AI error:", error);
-
-    await Issue.findByIdAndUpdate(issueId, {
-      aiStatus: "Failed",
-    });
+    await Issue.findByIdAndUpdate(issueId, { aiStatus: "Failed" });
   }
 }
-function calculateDistanceInMeters(lat1, lon1, lat2, lon2) {
-  const R = 6371000; // Earth's radius in meters
 
+// ─── GEOLOCATION / DUPLICATE ENGINE ──────────────────────────────────────
+
+function calculateDistanceInMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
-
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
-
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
   return R * c;
 }
 
 async function findDuplicateIssue(newLat, newLon, category) {
-  // Ensure we have numbers to work with
   const lat1 = parseFloat(newLat);
   const lon1 = parseFloat(newLon);
 
   if (isNaN(lat1) || isNaN(lon1)) {
-    console.log("⚠️ [DUPLICATE ENGINE] Invalid incoming coordinates skipped.");
+    console.log("⚠️ [DUPLICATE ENGINE] Invalid coordinates skipped.");
     return null;
   }
 
-  // FOR TESTING: Let's expand this to look at issues from the last 7 days 
-  // instead of just 48 hours, ensuring your test entries catch each other.
   const lookbackPeriod = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); 
+  console.log(`🔍 [DUPLICATE ENGINE] Checking "${category}" near (${lat1}, ${lon1})`);
 
-  console.log(`🔍 [DUPLICATE ENGINE] Checking category "${category}" near (${lat1}, ${lon1})`);
-
-  // Find active, unresolved issues of the same category
   const existingIssues = await Issue.find({
     category,
     status: { $ne: "Resolved" },
@@ -282,92 +249,75 @@ async function findDuplicateIssue(newLat, newLon, category) {
     createdAt: { $gte: lookbackPeriod },
   });
 
-  console.log(`📊 [DUPLICATE ENGINE] Found ${existingIssues.length} potential historical matches to calculate distance against.`);
-
   for (const issue of existingIssues) {
     if (!issue.latitude || !issue.longitude) continue;
 
     const lat2 = parseFloat(issue.latitude);
     const lon2 = parseFloat(issue.longitude);
-
     if (isNaN(lat2) || isNaN(lon2)) continue;
 
-    // Calculate actual distance in meters
     const distance = calculateDistanceInMeters(lat1, lon1, lat2, lon2);
-    
-    console.log(`📏 [DUPLICATE ENGINE] Distance to Issue ${issue.issueId}: ${distance.toFixed(1)} meters`);
+    console.log(`📏 Distance to Issue ${issue.issueId}: ${distance.toFixed(1)} meters`);
 
-    // Match found if within 250 meters (slightly increased from 200 for easier local testing)
     if (distance <= 250) {
-      console.log(`🎯 [DUPLICATE MATCH FOUND!] Linked to parent issue: ${issue.issueId}`);
+      console.log(`🎯 DUPLICATE FOUND! Linked to parent: ${issue.issueId}`);
       return issue;
     }
   }
 
-  console.log("❌ [DUPLICATE ENGINE] No matching duplicate found nearby.");
+  console.log("❌ [DUPLICATE ENGINE] No match found nearby.");
   return null;
 }
-// Submit issue and save in MongoDB
+
+// ─── ISSUE MANIPULATION ENDPOINTS ────────────────────────────────────────
+
 app.post("/submit", protectUser, upload.single("image"), async (req, res) => {
   try {
-    // 1. Run the duplicate engine using incoming user details
     const duplicateIssue = await findDuplicateIssue(
       Number(req.body.latitude),
       Number(req.body.longitude),
       req.body.category
     );
 
-    // 2. Build the issue document exactly per your schema parameters
     const newIssue = new Issue({
       aiStatus: "Processing",
       issueId: "FIX" + Date.now(),
-
       name: req.body.name,
       email: req.body.email,
-
       title: req.body.title,
       category: req.body.category,
       description: req.body.description,
       location: req.body.location,
       latitude: req.body.latitude,
       longitude: req.body.longitude,
-
       image: req.file?.path || "",
-
       severity: req.body.severity || "Medium",
       priority: req.body.priority || "Moderate",
-
       status: "Pending",
-
-      // Injecting the structural duplicate tracking logic here
       isDuplicate: !!duplicateIssue,
       parentIssueId: duplicateIssue ? duplicateIssue.issueId : "",
       duplicateCount: 1,
     });
 
-    // 3. Save the entry to MongoDB
     await newIssue.save();
 
-    // 4. If a match was found, update the original parent issue count
     if (duplicateIssue) {
       await Issue.findByIdAndUpdate(duplicateIssue._id, {
         $inc: { duplicateCount: 1 },
       });
     }
 
-    // 5. Send the response back cleanly to the user dashboard
     res.json({
-  success: true,
-  message: duplicateIssue
-    ? `This issue looks similar to an existing report (${duplicateIssue.issueId}). We have linked it for admin review.`
-    : "Issue saved successfully. AI analysis is processing.",
-  duplicateOf: duplicateIssue ? duplicateIssue.issueId : null,
-  isDuplicate: !!duplicateIssue,
-  issueId: newIssue.issueId,
-  issue: newIssue,
-});
+      success: true,
+      message: duplicateIssue
+        ? `This issue looks similar to an existing report (${duplicateIssue.issueId}). We have linked it for admin review.`
+        : "Issue saved successfully. AI analysis is processing.",
+      duplicateOf: duplicateIssue ? duplicateIssue.issueId : null,
+      isDuplicate: !!duplicateIssue,
+      issueId: newIssue.issueId,
+      issue: newIssue,
+    });
 
-    // 6. Spawn the Gemini background worker to do forensic text/image matching
     setImmediate(() => {
       analyzeIssueInBackground(
         newIssue._id,
@@ -377,48 +327,30 @@ app.post("/submit", protectUser, upload.single("image"), async (req, res) => {
         newIssue.category
       );
     });
-
-    return;
-    
   } catch (error) {
     console.log("Submit error:", error);
-
-    res.status(500).json({
-      error: "Failed to save issue",
-    });
+    res.status(500).json({ error: "Failed to save issue" });
   }
 });
 
-// Track issue by issueId
 app.get("/track/:issueId", async (req, res) => {
   try {
-    const issue = await Issue.findOne({
-      issueId: req.params.issueId,
-    });
-
+    const issue = await Issue.findOne({ issueId: req.params.issueId });
     if (!issue) {
-      return res.status(404).json({
-        error: "Issue not found",
-      });
+      return res.status(404).json({ error: "Issue not found" });
     }
-
     res.json(issue);
   } catch (error) {
     console.log("Track error:", error);
-
-    res.status(500).json({
-      error: "Server error",
-    });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-
+// Admin Panel Fetch: Filters out duplicates entirely to avoid flood crashes
 app.get("/issues", protectAdmin, async (req, res) => {
   try {
-    // 1. Fetch EVERYTHING in the collection first to make sure records display
-    const issues = await Issue.find({}).sort({ createdAt: -1 });
-    
-    console.log(`🟢 [ADMIN FETCH] Found ${issues.length} total issues in MongoDB.`);
+    const issues = await Issue.find({ isDuplicate: false }).sort({ createdAt: -1 });
+    console.log(`🟢 [ADMIN FETCH] Displaying ${issues.length} unique parent issues.`);
     res.json(issues);
   } catch (error) {
     console.log("Fetch issues error:", error);
@@ -426,41 +358,38 @@ app.get("/issues", protectAdmin, async (req, res) => {
   }
 });
 
-// Admin: update issue status
-
+// Admin Status Updates: Cascades resolution to every linked child duplicate report
 app.patch("/issues/:id/status", protectAdmin, async (req, res) => {
   try {
-    
-    
-
-   const updatedIssue = await Issue.findByIdAndUpdate(
-  req.params.id,
-  { status: req.body.status },
-  { new: true }
-);
-
-if (updatedIssue && updatedIssue.duplicateCount > 1) {
-  await Issue.updateMany(
-    { parentIssueId: updatedIssue.issueId },
-    { status: req.body.status }
-  );
-}
+    const updatedIssue = await Issue.findByIdAndUpdate(
+      req.params.id,
+      { status: req.body.status },
+      { new: true }
+    );
 
     if (!updatedIssue) {
       return res.status(404).json({ error: "Issue not found" });
     }
 
-    
+    // Always push updates out to linked child entries matching parentIssueId
+    await Issue.updateMany(
+      { parentIssueId: updatedIssue.issueId },
+      { status: req.body.status }
+    );
+
+    console.log(`🔔 [STATUS CASCADE] Main issue ${updatedIssue.issueId} and all duplicates set to: ${req.body.status}`);
     res.json(updatedIssue);
   } catch (error) {
-   console.log("Update status error:", error);
+    console.log("Update status error:", error);
     res.status(500).json({ error: "Failed to update status" });
   }
 });
+
+// ─── AUTH & ACCOUNT MANAGEMENT ───────────────────────────────────────────
+
 app.post("/auth/signup", async (req, res) => {
   try {
     const { name, email, password } = req.body;
-
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
@@ -468,7 +397,6 @@ app.post("/auth/signup", async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const user = new User({
       name,
       email,
@@ -477,30 +405,19 @@ app.post("/auth/signup", async (req, res) => {
     });
 
     await user.save();
-
-    res.json({
-      success: true,
-      message: "Account created successfully",
-    });
-
+    res.json({ success: true, message: "Account created successfully" });
   } catch (error) {
-  console.log("Signup error:", error);
-  res.status(500).json({ error: "Signup failed" });
-}
+    console.log("Signup error:", error);
+    res.status(500).json({ error: "Signup failed" });
+  }
 });
+
 app.post("/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-
     const user = await User.findOne({ email });
 
-    if (!user) {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
@@ -513,40 +430,20 @@ app.post("/auth/login", async (req, res) => {
     res.json({
       success: true,
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role },
     });
-
   } catch (error) {
-  console.log("Login error:", error);
-  res.status(500).json({ error: "Login failed" });
-}
+    console.log("Login error:", error);
+    res.status(500).json({ error: "Login failed" });
+  }
 });
+
 app.post("/admin/login", (req, res) => {
   const { email, password } = req.body;
 
-  if (
-    email === process.env.ADMIN_EMAIL &&
-    password === process.env.ADMIN_PASSWORD
-  ) {
-    const token = jwt.sign(
-      { email, role: "admin" },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
-    return res.json({
-      success: true,
-      token,
-      admin: {
-        email,
-        role: "admin",
-      },
-    });
+  if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
+    const token = jwt.sign({ email, role: "admin" }, process.env.JWT_SECRET, { expiresIn: "1d" });
+    return res.json({ success: true, token, admin: { email, role: "admin" } });
   }
 
   res.status(401).json({ error: "Invalid admin credentials" });
@@ -555,14 +452,13 @@ app.post("/admin/login", (req, res) => {
 app.get("/test", (req, res) => {
   res.json({ message: "Backend working" });
 });
+
+// User Dashboard History: Filters duplicates out so timeline remains elegant
 app.get("/history/:email", protectUser, async (req, res) => {
   try {
     const userEmail = req.params.email;
-    
-    // Find issues matching the user's email address
-    const issues = await Issue.find({ email: userEmail }).sort({ createdAt: -1 });
-    
-    console.log(`🔵 [USER HISTORY] Found ${issues.length} issues for ${userEmail}`);
+    const issues = await Issue.find({ email: userEmail, isDuplicate: false }).sort({ createdAt: -1 });
+    console.log(`🔵 [USER HISTORY] Sending ${issues.length} primary issues to ${userEmail}`);
     res.json(issues);
   } catch (error) {
     console.log("History fetch error:", error);
@@ -571,7 +467,6 @@ app.get("/history/:email", protectUser, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
   console.log(`🚀 Running on port ${PORT}`);
 });
