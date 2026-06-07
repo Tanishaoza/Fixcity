@@ -259,6 +259,11 @@ function calculateDistanceInMeters(lat1, lon1, lat2, lon2) {
 }
 
 async function findDuplicateIssue(newLat, newLon, category) {
+  // If incoming coordinates are missing or invalid, bypass duplicate check entirely
+  if (!newLat || !newLon || isNaN(newLat) || isNaN(newLon)) {
+    return null;
+  }
+
   const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
   // Find active, unresolved issues of the same category reported in the last 48 hours
@@ -270,7 +275,15 @@ async function findDuplicateIssue(newLat, newLon, category) {
   });
 
   for (const issue of existingIssues) {
-    if (!issue.latitude || !issue.longitude) continue;
+    // CRUCIAL FIX: Explicitly validate coordinates exist on the historical record
+    if (
+      !issue.latitude || 
+      !issue.longitude || 
+      isNaN(Number(issue.latitude)) || 
+      isNaN(Number(issue.longitude))
+    ) {
+      continue; // Skip broken test records safely instead of crashing
+    }
 
     const distance = calculateDistanceInMeters(
       Number(newLat),
