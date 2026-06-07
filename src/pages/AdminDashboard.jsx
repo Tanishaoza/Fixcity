@@ -329,46 +329,44 @@ export default function AdminDashboard() {
     assigned: issues.filter(i => i.status==="Assigned").length,
     resolved: issues.filter(i => i.status==="Resolved").length,
   };
-const totalUniqueLocations = issues.length;
- // ─── DYNAMIC STATISTICS & CALCULATIONS ───
-  const totalRealReportsCount = issues.reduce((sum, item) => sum + (item.duplicateCount || 1), 0);
-  const activeCriticalCount = issues.filter(item => item.priority === "Critical").length;
-  
-  const topAreas = Object.entries(
-    issues.reduce((acc,i) => { const a=cleanArea(i.location); if(a) acc[a]=(acc[a]||0)+1; return acc; }, {})
-  ).sort((a,b)=>b[1]-a[1]).slice(0,3);
-
-  // ─── PERFECTED DEDUPLICATION PIPELINE ───
+// ─── 1. RUN THE FILTER & DEDUPLICATION PIPELINE FIRST ───
   const uniqueSeenKeys = new Set();
 
   const filtered = issues
-    // Step 1: Filter out items based on Search text and Status dropdowns first
+    // Step A: Filter out items based on Search text and Status dropdowns
     .filter(issue => {
       const q = search.toLowerCase();
       const matchStatus = statusFilter === "All" || (statusFilter === "Active" && issue.status !== "Resolved") || issue.status === statusFilter;
       const matchSearch = !q || [issue.issueId, issue.title, issue.category, issue.location, issue.name, issue.email].some(f => f?.toLowerCase().includes(q));
       return matchStatus && matchSearch;
     })
-    // Step 2: Skip child cards explicitly marked by your database script
+    // Step B: Skip child cards explicitly marked by your database script
     .filter(issue => issue.isDuplicate === false || !issue.isDuplicate)
-    // Step 3: Pure frontend layout fallback deduplication
+    // Step C: Frontend fallback deduplication
     .filter(issue => {
       const cleanTitle = (issue.title || "").toLowerCase().trim();
       const cleanLoc = (issue.location || "").toLowerCase().trim();
       const fingerprint = `${cleanTitle}-${cleanLoc}`;
       
       if (uniqueSeenKeys.has(fingerprint)) {
-        return false; // Skip the row layout if a matching copy is already on screen
+        return false;
       }
       uniqueSeenKeys.add(fingerprint);
       return true;
     });
 
-  // ✅ FIX: Calculate Unique Spots and Spam directly from the visible filtered results!
-  const totalUniqueLocations = filtered.length;
-  const totalDuplicatesLinked = filtered.reduce((sum, item) => sum + (Math.max(1, item.duplicateCount || 1) - 1), 0);
+  // ─── 2. CALCULATE METRICS DIRECTLY FROM WHAT IS VISIBLE ON SCREEN ───
+  // This makes sure the numbers perfectly match your 1 visible row!
+  const totalUniqueLocations = filtered.length; 
+  const totalRealReportsCount = filtered.reduce((sum, item) => sum + (item.duplicateCount || 1), 0);
+  const totalDuplicatesLinked = Math.max(0, totalRealReportsCount - totalUniqueLocations);
 
-  const resRate = stats.total > 0 ? Math.round((stats.resolved/stats.total)*100) : 0;
+  const activeCriticalCount = filtered.filter(item => item.priority === "Critical").length;
+  const topAreas = Object.entries(
+    filtered.reduce((acc,i) => { const a=cleanArea(i.location); if(a) acc[a]=(acc[a]||0)+1; return acc; }, {})
+  ).sort((a,b)=>b[1]-a[1]).slice(0,3);
+
+  const resRate = stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
