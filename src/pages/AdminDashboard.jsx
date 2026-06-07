@@ -192,7 +192,7 @@ function IssueRow({ issue, onUpdate, updating }) {
               {issue.location?.startsWith("GPS") ? "Auto-detected" : issue.location || "Unavailable"}
             </p>
             {issue.latitude && issue.longitude && (
-              <a href={`https://www.google.com/maps?q=${issue.latitude},${issue.longitude}`}
+              <a href={`http://googleusercontent.com/maps.google.com/${issue.latitude},${issue.longitude}`}
   target="_blank" rel="noreferrer"
   className="text-[9px] text-blue-500 hover:text-blue-700 font-bold mt-0.5 inline-block">
   Open Maps →
@@ -337,12 +337,11 @@ const totalUniqueLocations = issues.length;
     issues.reduce((acc,i) => { const a=cleanArea(i.location); if(a) acc[a]=(acc[a]||0)+1; return acc; }, {})
   ).sort((a,b)=>b[1]-a[1]).slice(0,3);
 
-  // ─── CORRECT PLACEMENT SEQUENCE ───
-  // ─── OPTIMIZED FILTER PIPELINE ───
+  // ─── PERFECTED DEDUPLICATION PIPELINE ───
   const uniqueSeenKeys = new Set();
 
   const filtered = issues
-    // Step 1: Handle Search parameters and Status filters first
+    // Step 1: Filter out items based on Search text and Status dropdowns first
     .filter(issue => {
       const q = search.toLowerCase();
       const matchStatus = statusFilter === "All" || (statusFilter === "Active" && issue.status !== "Resolved") || issue.status === statusFilter;
@@ -351,15 +350,14 @@ const totalUniqueLocations = issues.length;
     })
     // Step 2: Skip child cards explicitly marked by your database script
     .filter(issue => issue.isDuplicate === false || !issue.isDuplicate)
-    // Step 3: Pure frontend layout fallback deduplication
+    // Step 3: Pure frontend layout fallback deduplication (Only tracks what passed Step 1!)
     .filter(issue => {
-      // Force strings to lowercase and clear trailing white spaces to guarantee matches
       const cleanTitle = (issue.title || "").toLowerCase().trim();
       const cleanLoc = (issue.location || "").toLowerCase().trim();
       const fingerprint = `${cleanTitle}-${cleanLoc}`;
       
       if (uniqueSeenKeys.has(fingerprint)) {
-        return false; // Skip the row rendering block
+        return false; // Skip the row layout if a matching copy is already on screen
       }
       uniqueSeenKeys.add(fingerprint);
       return true;
