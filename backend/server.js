@@ -395,17 +395,14 @@ app.get("/track/:issueId", async (req, res) => {
 
 app.get("/issues", protectAdmin, async (req, res) => {
   try {
-    // This finds everything EXCEPT issues where isDuplicate is explicitly true
-    const issues = await Issue.find({ 
-      isDuplicate: { $ne: true } 
-    }).sort({ createdAt: -1 });
+    // 1. Fetch EVERYTHING in the collection first to make sure records display
+    const issues = await Issue.find({}).sort({ createdAt: -1 });
     
+    console.log(`🟢 [ADMIN FETCH] Found ${issues.length} total issues in MongoDB.`);
     res.json(issues);
   } catch (error) {
     console.log("Fetch issues error:", error);
-    res.status(500).json({
-      error: "Failed to fetch issues",
-    });
+    res.status(500).json({ error: "Failed to fetch issues" });
   }
 });
 
@@ -540,12 +537,15 @@ app.get("/test", (req, res) => {
 });
 app.get("/history/:email", protectUser, async (req, res) => {
   try {
-    const issues = await Issue.find({
-      email: req.params.email,
-    }).sort({ createdAt: -1 });
-
+    const userEmail = req.params.email;
+    
+    // Find issues matching the user's email address
+    const issues = await Issue.find({ email: userEmail }).sort({ createdAt: -1 });
+    
+    console.log(`🔵 [USER HISTORY] Found ${issues.length} issues for ${userEmail}`);
     res.json(issues);
   } catch (error) {
+    console.log("History fetch error:", error);
     res.status(500).json({ error: "Failed to fetch history" });
   }
 });

@@ -561,25 +561,31 @@ export default function ReportIssue() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (
-      !form.name ||
-      !form.email ||
-      !form.title ||
-      !form.category ||
-      !form.description
-    ) {
+    // Fetch the fresh current session data right before sending
+    const currentUser = JSON.parse(localStorage.getItem("user"));
+    const token = localStorage.getItem("userToken"); // Must match your storage key!
+
+    if (!token) {
+      alert("Your session has expired. Please log in again.");
+      navigate("/login");
+      return;
+    }
+
+    if (!form.title || !form.category || !form.description) {
       alert("Please fill in all required fields.");
       return;
     }
 
     if (!selectedPosition) {
-  alert("Please allow location access.")
-  return
-}
+      alert("Please allow location access so we can drop a map pin.");
+      return;
+    }
+
     if (form.category === "Other" && !customCategory.trim()) {
       alert("Please describe the issue type in the Other field.");
       return;
     }
+
     if (!imageFile) {
       alert("Please upload an image of the issue.");
       return;
@@ -588,7 +594,6 @@ export default function ReportIssue() {
     setLoading(true);
 
     try {
-      // Attempt backend submit — graceful fallback if offline
       const formData = new FormData();
       formData.append("image", imageFile);
       formData.append("title", form.title);
@@ -597,44 +602,56 @@ export default function ReportIssue() {
         "category",
         form.category === "Other" ? customCategory : form.category,
       );
-      
 
       formData.append("location", form.location);
       formData.append("latitude", selectedPosition?.lat || "");
       formData.append("longitude", selectedPosition?.lng || "");
-      formData.append("name", form.name);
-      formData.append("email", form.email);
+      
+      // CRUCIAL FIX: Read explicitly from current storage user object
+      formData.append("name", currentUser?.name || "Anonymous Citizen");
+      formData.append("email", currentUser?.email || "unknown@email.com");
+      
       formData.append("severity", "Medium");
-formData.append("priority", "Moderate");
+      formData.append("priority", "Moderate");
 
       const response = await fetch("https://fixcity-0wi0.onrender.com/submit", {
         method: "POST",
+        headers: {
+          // Critical Auth Link matching backend protectUser middleware requirements
+          "Authorization": `Bearer ${token}`
+        },
         body: formData,
-        signal: AbortSignal.timeout(6000),
       });
 
       if (response.ok) {
         const data = await response.json();
         if (data.severity) setAiResult(data);
+        
+        // Only trigger layout notification on HTTP 200 Success
+        setSubmitted(true);
+        setTimeout(() => setSubmitted(false), 4500);
+
+        // Reset inputs smoothly only AFTER confirmation
+        setForm({
+          name: currentUser?.name || "",
+          email: currentUser?.email || "",
+          title: "",
+          category: "",
+          description: "",
+          location: "",
+        });
+        setAiResult(null);
+        setCustomCategory("");
+        removeImage();
+      } else {
+        const errData = await response.json();
+        alert(`Submission failed: ${errData.error || "Unknown server error"}`);
       }
     } catch (error) {
-  console.log("FRONTEND AI ERROR:", error);
-}finally {
+      console.log("FRONTEND SUBMIT ERROR:", error);
+      alert("Could not connect to the reporting server. Check your network.");
+    } finally {
       setLoading(false);
-      setSubmitted(true);
-      setTimeout(() => setSubmitted(false), 4500);
-      // Reset form
-      setForm({
-        name: "",
-        email: "",
-        title: "",
-        category: "",
-        description: "",
-        location: "",
-      });
-      setAiResult(null);
-      setCustomCategory("");
-      removeImage();
     }
   };
 
