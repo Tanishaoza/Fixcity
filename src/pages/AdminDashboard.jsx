@@ -330,9 +330,10 @@ export default function AdminDashboard() {
     resolved: issues.filter(i => i.status==="Resolved").length,
   };
 const totalUniqueLocations = issues.length;
+ // ─── DYNAMIC STATISTICS & CALCULATIONS ───
   const totalRealReportsCount = issues.reduce((sum, item) => sum + (item.duplicateCount || 1), 0);
-  const totalDuplicatesLinked = Math.max(0, totalRealReportsCount - totalUniqueLocations);
   const activeCriticalCount = issues.filter(item => item.priority === "Critical").length;
+  
   const topAreas = Object.entries(
     issues.reduce((acc,i) => { const a=cleanArea(i.location); if(a) acc[a]=(acc[a]||0)+1; return acc; }, {})
   ).sort((a,b)=>b[1]-a[1]).slice(0,3);
@@ -350,7 +351,7 @@ const totalUniqueLocations = issues.length;
     })
     // Step 2: Skip child cards explicitly marked by your database script
     .filter(issue => issue.isDuplicate === false || !issue.isDuplicate)
-    // Step 3: Pure frontend layout fallback deduplication (Only tracks what passed Step 1!)
+    // Step 3: Pure frontend layout fallback deduplication
     .filter(issue => {
       const cleanTitle = (issue.title || "").toLowerCase().trim();
       const cleanLoc = (issue.location || "").toLowerCase().trim();
@@ -362,6 +363,11 @@ const totalUniqueLocations = issues.length;
       uniqueSeenKeys.add(fingerprint);
       return true;
     });
+
+  // ✅ FIX: Calculate Unique Spots and Spam directly from the visible filtered results!
+  const totalUniqueLocations = filtered.length;
+  const totalDuplicatesLinked = filtered.reduce((sum, item) => sum + (Math.max(1, item.duplicateCount || 1) - 1), 0);
+
   const resRate = stats.total > 0 ? Math.round((stats.resolved/stats.total)*100) : 0;
 
   return (
