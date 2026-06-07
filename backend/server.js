@@ -349,11 +349,15 @@ app.get("/track/:issueId", async (req, res) => {
 // Admin Panel Fetch: Filters out duplicates entirely to avoid flood crashes
 app.get("/issues", protectAdmin, async (req, res) => {
   try {
-    const issues = await Issue.find({ isDuplicate: false }).sort({ createdAt: -1 });
-    console.log(`🟢 [ADMIN FETCH] Displaying ${issues.length} unique parent issues.`);
+    const issues = await Issue.find({
+      $or: [
+        { isDuplicate: false },
+        { isDuplicate: { $exists: false } }
+      ]
+    }).sort({ createdAt: -1 });
+
     res.json(issues);
   } catch (error) {
-    console.log("Fetch issues error:", error);
     res.status(500).json({ error: "Failed to fetch issues" });
   }
 });
@@ -453,15 +457,15 @@ app.get("/test", (req, res) => {
   res.json({ message: "Backend working" });
 });
 
-// User Dashboard History: Filters duplicates out so timeline remains elegant
+// User Dashboard History: Shows all reports submitted by the user, including duplicates
 app.get("/history/:email", protectUser, async (req, res) => {
   try {
-    const userEmail = req.params.email;
-    const issues = await Issue.find({ email: userEmail, isDuplicate: false }).sort({ createdAt: -1 });
-    console.log(`🔵 [USER HISTORY] Sending ${issues.length} primary issues to ${userEmail}`);
+    const issues = await Issue.find({
+      email: req.params.email,
+    }).sort({ createdAt: -1 });
+
     res.json(issues);
   } catch (error) {
-    console.log("History fetch error:", error);
     res.status(500).json({ error: "Failed to fetch history" });
   }
 });
