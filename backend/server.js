@@ -259,45 +259,52 @@ function calculateDistanceInMeters(lat1, lon1, lat2, lon2) {
 }
 
 async function findDuplicateIssue(newLat, newLon, category) {
-  // If incoming coordinates are missing or invalid, bypass duplicate check entirely
-  if (!newLat || !newLon || isNaN(newLat) || isNaN(newLon)) {
+  // Ensure we have numbers to work with
+  const lat1 = parseFloat(newLat);
+  const lon1 = parseFloat(newLon);
+
+  if (isNaN(lat1) || isNaN(lon1)) {
+    console.log("⚠️ [DUPLICATE ENGINE] Invalid incoming coordinates skipped.");
     return null;
   }
 
-  const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  // FOR TESTING: Let's expand this to look at issues from the last 7 days 
+  // instead of just 48 hours, ensuring your test entries catch each other.
+  const lookbackPeriod = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); 
 
-  // Find active, unresolved issues of the same category reported in the last 48 hours
+  console.log(`🔍 [DUPLICATE ENGINE] Checking category "${category}" near (${lat1}, ${lon1})`);
+
+  // Find active, unresolved issues of the same category
   const existingIssues = await Issue.find({
     category,
     status: { $ne: "Resolved" },
     isDuplicate: false,
-    createdAt: { $gte: twoDaysAgo },
+    createdAt: { $gte: lookbackPeriod },
   });
 
+  console.log(`📊 [DUPLICATE ENGINE] Found ${existingIssues.length} potential historical matches to calculate distance against.`);
+
   for (const issue of existingIssues) {
-    // CRUCIAL FIX: Explicitly validate coordinates exist on the historical record
-    if (
-      !issue.latitude || 
-      !issue.longitude || 
-      isNaN(Number(issue.latitude)) || 
-      isNaN(Number(issue.longitude))
-    ) {
-      continue; // Skip broken test records safely instead of crashing
-    }
+    if (!issue.latitude || !issue.longitude) continue;
 
-    const distance = calculateDistanceInMeters(
-      Number(newLat),
-      Number(newLon),
-      Number(issue.latitude),
-      Number(issue.longitude)
-    );
+    const lat2 = parseFloat(issue.latitude);
+    const lon2 = parseFloat(issue.longitude);
 
-    // Match found if within 200 meters
-    if (distance <= 200) {
+    if (isNaN(lat2) || isNaN(lon2)) continue;
+
+    // Calculate actual distance in meters
+    const distance = calculateDistanceInMeters(lat1, lon1, lat2, lon2);
+    
+    console.log(`📏 [DUPLICATE ENGINE] Distance to Issue ${issue.issueId}: ${distance.toFixed(1)} meters`);
+
+    // Match found if within 250 meters (slightly increased from 200 for easier local testing)
+    if (distance <= 250) {
+      console.log(`🎯 [DUPLICATE MATCH FOUND!] Linked to parent issue: ${issue.issueId}`);
       return issue;
     }
   }
 
+  console.log("❌ [DUPLICATE ENGINE] No matching duplicate found nearby.");
   return null;
 }
 // Submit issue and save in MongoDB
