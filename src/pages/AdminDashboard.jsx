@@ -306,6 +306,7 @@ export default function AdminDashboard() {
   const [statusFilter, setStatus] = useState("Active");
   const [updatingId, setUpdating] = useState(null);
   const [lastSync, setLastSync]   = useState(new Date());
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
   const fetchIssues = async () => {
     setLoading(true);

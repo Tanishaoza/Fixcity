@@ -328,7 +328,7 @@ function IssueTable({ issues }) {
                     </div>
                   </td>
 
-                  {/* Progress */}
+                  
                  
                   {/* Progress */}
                   <td className="px-5 py-4 min-w-[170px]">
