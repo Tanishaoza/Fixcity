@@ -268,6 +268,17 @@ function IssueRow({ issue, onUpdate, updating }) {
           {issue.aiConfidence > 0 && (
             <p className="text-[9px] font-semibold text-slate-500">Confidence: {issue.aiConfidence}%</p>
           )}
+          {issue.verificationStatus && issue.verificationStatus !== "Verified" && (
+  <Badge className="bg-red-50 text-red-700 border-red-200 w-fit">
+    ⚠ {issue.verificationStatus}
+  </Badge>
+)}
+
+{issue.matchScore > 0 && (
+  <p className="text-[9px] font-semibold text-slate-500">
+    Match Score: {issue.matchScore}%
+  </p>
+)}
           {issue.aiReason && (
             <p className="text-[9px] text-slate-400 leading-snug line-clamp-2">{issue.aiReason}</p>
           )}
