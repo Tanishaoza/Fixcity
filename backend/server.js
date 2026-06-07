@@ -395,16 +395,14 @@ app.get("/track/:issueId", async (req, res) => {
 
 app.get("/issues", protectAdmin, async (req, res) => {
   try {
-const issues = await Issue.find({
-  $or: [
-    { isDuplicate: false },
-    { isDuplicate: { $exists: false } }
-  ]
-}).sort({ createdAt: -1 });
+    // This finds everything EXCEPT issues where isDuplicate is explicitly true
+    const issues = await Issue.find({ 
+      isDuplicate: { $ne: true } 
+    }).sort({ createdAt: -1 });
+    
     res.json(issues);
   } catch (error) {
     console.log("Fetch issues error:", error);
-
     res.status(500).json({
       error: "Failed to fetch issues",
     });
