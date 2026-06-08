@@ -10,6 +10,7 @@ import cors from "cors";
 import multer from "multer";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
+import exifParser from "exif-parser";
 
 dotenv.config();
 
@@ -146,8 +147,38 @@ Return ONLY JSON:
   }
 });
 
+
+
 async function analyzeIssueInBackground(issueId, imageUrl, title, description, category) {
   try {
+    const imageResponse = await fetch(imageUrl);
+    const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const nodeBuffer = Buffer.from(imageBuffer); // Convert to Node.js Buffer for parsing
+
+    // 1. EXTRACT EXIF METADATA
+    let exifData = { lat: null, lon: null, date: null };
+    let exifNotes = "No original camera metadata found.";
+
+    try {
+      const parser = exifParser.create(nodeBuffer);
+      const result = parser.parse();
+      
+      if (result && result.tags) {
+        exifData.lat = result.tags.GPSLatitude || null;
+        exifData.lon = result.tags.GPSLongitude || null;
+        
+        if (result.tags.CreateDate) {
+          exifData.date = new Date(result.tags.CreateDate * 1000).toDateString();
+          exifNotes = `Photo captured on: ${exifData.date}`;
+        }
+      }
+    } catch (exifError) {
+      console.log("ℹ️ No EXIF data extracted (Likely a downloaded image/screenshot)");
+      exifNotes = "No camera metadata. Image might be a screenshot or internet download.";
+    }
+
+    // 2. RUN INTENSE PROMPT FOR GEMINI
     const prompt = `
 You are an AI civic issue verification inspector.
 Your job is not only to classify the issue, but also to check if the user's text matches the image.
@@ -168,12 +199,13 @@ Return ONLY valid JSON:
   "reason": "short reason explaining whether image and text match",
   "detectedObjects": ["object1", "object2"]
 }
+
+Rules:
+- Set "verificationStatus" to "Mismatch" and "matchScore" under 30 if the image shows something completely unrelated to the text description.
+- Set "verificationStatus" to "Suspicious" if the image looks like a meme, cartoon, or computer graphic instead of a real-world camera shot.
 `;
 
-    const imageResponse = await fetch(imageUrl);
-    const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
-    const imageBuffer = await imageResponse.arrayBuffer();
-    const base64Image = Buffer.from(imageBuffer).toString("base64");
+    const base64Image = nodeBuffer.toString("base64");
 
     const result = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -197,23 +229,33 @@ Return ONLY valid JSON:
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const aiResult = JSON.parse(text);
 
+    // 3. COMBINE EXIF TRUTH WITH AI RESULTS
+    // If Gemini thinks it's verified, but it has no hardware GPS data, mark as Suspicious for review
+    let finalVerificationStatus = aiResult.verificationStatus;
+    if (!exifData.lat && finalVerificationStatus === "Verified") {
+      finalVerificationStatus = "Suspicious";
+      exifNotes += " (Flagged: Missing embedded camera GPS location)";
+    }
+
+    // 4. UPDATE THE MONGODB ENTRY WITH NEW VERIFICATION DATA
     await Issue.findByIdAndUpdate(issueId, {
       category: aiResult.category,
       severity: aiResult.severity,
       priority: aiResult.priority,
       aiConfidence: aiResult.confidence,
-      aiReason: aiResult.reason,
+      aiReason: `${aiResult.reason} | EXIF Info: ${exifNotes}`,
       detectedObjects: aiResult.detectedObjects || [],
-      verificationStatus: aiResult.verificationStatus,
+      verificationStatus: finalVerificationStatus,
       matchScore: aiResult.matchScore,
       aiStatus: "Completed",
     });
+
+    console.log(`🎯 [VERIFICATION COMPLETE] Issue ${issueId} evaluated. Status: ${finalVerificationStatus}, Match Score: ${aiResult.matchScore}%`);
   } catch (error) {
     console.log("Background AI error:", error);
     await Issue.findByIdAndUpdate(issueId, { aiStatus: "Failed" });
   }
 }
-
 // ─── GEOLOCATION / DUPLICATE ENGINE ──────────────────────────────────────
 
 function calculateDistanceInMeters(lat1, lon1, lat2, lon2) {

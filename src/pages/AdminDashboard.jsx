@@ -172,13 +172,25 @@ function IssueRow({ issue, onUpdate, updating }) {
             <span className="text-[9px] font-bold text-slate-400 font-mono tracking-wider block">{issue.issueId}</span>
             <span className="text-sm font-semibold text-slate-800 group-hover:text-blue-700 transition-colors block leading-snug truncate max-w-[180px]">{issue.title}</span>
             {issue.duplicateCount > 1 && (
-  <div className="mt-1">
-    <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 text-[9px] font-bold px-2 py-0.5 rounded-full">
-      🚨 {issue.duplicateCount} reports linked
-    </span>
-  </div>
-)}
+              <div className="mt-1">
+                <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                  🚨 {issue.duplicateCount} reports linked
+                </span>
+              </div>
+            )}
             <span className="text-[10px] text-slate-400 block mt-0.5">{issue.category}</span>
+            
+            {/* AUDIT & METADATA ACCORDION DRAWER NESTED PROPERLY */}
+            {issue.aiReason && (
+              <div className="mt-2 p-2 bg-slate-50 border-l-2 border-blue-500 rounded-r-md max-w-[220px]">
+                <p className="text-[9px] font-black text-blue-700 flex items-center gap-1 uppercase tracking-wider">
+                  🛡️ Audit & Metadata Log
+                </p>
+                <p className="text-[10px] text-slate-600 mt-0.5 italic leading-tight line-clamp-3 hover:line-clamp-none transition-all duration-300 cursor-pointer">
+                  {issue.aiReason}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </td>
@@ -235,11 +247,8 @@ function IssueRow({ issue, onUpdate, updating }) {
         </Badge>
       </td>
 
-      {/* AI Analysis — compact */}
-      <td className="px-4 py-3.5">
+     <td className="px-4 py-3.5">
         <div className="flex flex-col gap-1.5">
-
-          {/* Status row: badge + confidence on one line */}
           <div className="flex items-center gap-1.5">
             <Badge className={`${aiCfg.bg} ${aiCfg.text} border-transparent`}>
               <Dot className={aiCfg.dot} />
@@ -250,17 +259,32 @@ function IssueRow({ issue, onUpdate, updating }) {
             )}
           </div>
 
-         {/* Show only mismatch */}
-{issue.verificationStatus === "Mismatch" && (
-  <Badge className="bg-red-50 text-red-700 border-red-200 w-fit">
-    ⚠ Mismatch
-  </Badge>
-)}
+          {issue.aiStatus === "Completed" && (
+            <div className="flex flex-col gap-1 mt-0.5">
+              {issue.verificationStatus === "Verified" && (
+                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider w-fit">
+                  ✓ AI Verified ({issue.matchScore || 0}%)
+                </span>
+              )}
+              {issue.verificationStatus === "Suspicious" && (
+                <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider w-fit">
+                  ⚠️ Suspicious ({issue.matchScore || 0}%)
+                </span>
+              )}
+              {issue.verificationStatus === "Mismatch" && (
+                <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider w-fit">
+                  🚨 Mismatch ({issue.matchScore || 0}%)
+                </span>
+              )}
+            </div>
+          )}
 
-         
+          {issue.aiStatus === "Processing" && (
+            <span className="text-[9px] text-slate-400 font-medium italic">Evaluating data authenticity...</span>
+          )}
         </div>
       </td>
-
+    
       {/* Date */}
       <td className="px-4 py-3.5 whitespace-nowrap">
         <div className="flex items-center gap-1 text-[11px] text-slate-500">
