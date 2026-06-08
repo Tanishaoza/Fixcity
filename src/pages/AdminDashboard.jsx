@@ -155,22 +155,27 @@ function StatusDropdown({ issueId, currentStatus, onUpdate, updating }) {
 }
 
 // ─── Issue Row ─────────────────────────────────────────────────────────────────
+// ─── Issue Row ─────────────────────────────────────────────────────────────────
 function IssueRow({ issue, onUpdate, updating }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const pri   = PRIORITY_CONFIG[issue.priority] || {};
   const aiCfg = AI_STATUS_CONFIG[issue.aiStatus || "Processing"] || AI_STATUS_CONFIG.Processing;
-
-  
 
   return (
     <tr className="hover:bg-slate-50/60 transition-colors group border-b border-slate-100 last:border-0">
 
-      {/* Issue */}
-      <td className="px-4 py-3.5">
-        <div className="flex items-start gap-2.5">
+      {/* Issue Column - Now Clickable */}
+      <td className="px-4 py-3.5 align-top">
+        <div 
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-start gap-2.5 cursor-pointer select-none group/click"
+        >
           <div className={`mt-1 w-1 h-8 rounded-full flex-shrink-0 ${pri.bar||"bg-slate-200"}`} />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <span className="text-[9px] font-bold text-slate-400 font-mono tracking-wider block">{issue.issueId}</span>
-            <span className="text-sm font-semibold text-slate-800 group-hover:text-blue-700 transition-colors block leading-snug truncate max-w-[180px]">{issue.title}</span>
+            <span className="text-sm font-semibold text-slate-800 group-hover/click:text-blue-700 transition-colors block leading-snug truncate max-w-[180px]">
+              {issue.title}
+            </span>
             {issue.duplicateCount > 1 && (
               <div className="mt-1">
                 <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 text-[9px] font-bold px-2 py-0.5 rounded-full">
@@ -180,13 +185,17 @@ function IssueRow({ issue, onUpdate, updating }) {
             )}
             <span className="text-[10px] text-slate-400 block mt-0.5">{issue.category}</span>
             
-            {/* AUDIT & METADATA ACCORDION DRAWER NESTED PROPERLY */}
-            {issue.aiReason && (
-              <div className="mt-2 p-2 bg-slate-50 border-l-2 border-blue-500 rounded-r-md max-w-[220px]">
-                <p className="text-[9px] font-black text-blue-700 flex items-center gap-1 uppercase tracking-wider">
+            <span className="text-[9px] font-bold text-blue-500 mt-1.5 flex items-center gap-1 opacity-60 group-hover/click:opacity-100 transition-opacity">
+              {isExpanded ? "▲ Hide Details" : "▼ Click to view Audit Log"}
+            </span>
+
+            {/* EXPANDABLE CARD DRAWER */}
+            {isExpanded && issue.aiReason && (
+              <div className="mt-2.5 p-2.5 bg-slate-50 border border-slate-200 border-l-4 border-l-blue-500 rounded-r-xl shadow-inner max-w-[240px] animate-fadeIn">
+                <p className="text-[9px] font-black text-blue-700 flex items-center gap-1 uppercase tracking-wider mb-1">
                   🛡️ Audit & Metadata Log
                 </p>
-                <p className="text-[10px] text-slate-600 mt-0.5 italic leading-tight line-clamp-3 hover:line-clamp-none transition-all duration-300 cursor-pointer">
+                <p className="text-[10px] text-slate-600 font-medium leading-relaxed italic whitespace-pre-wrap">
                   {issue.aiReason}
                 </p>
               </div>
@@ -196,7 +205,7 @@ function IssueRow({ issue, onUpdate, updating }) {
       </td>
 
       {/* Location */}
-      <td className="px-4 py-3.5 max-w-[160px]">
+      <td className="px-4 py-3.5 max-w-[160px] align-top">
         <div className="flex items-start gap-1">
           <MapPin size={11} className="text-blue-400 mt-0.5 flex-shrink-0" />
           <div className="min-w-0">
@@ -205,18 +214,17 @@ function IssueRow({ issue, onUpdate, updating }) {
             </p>
             {issue.latitude && issue.longitude && (
               <a href={`https://www.google.com/maps?q=${issue.latitude},${issue.longitude}`}
-  target="_blank" rel="noreferrer"
-  className="text-[9px] text-blue-500 hover:text-blue-700 font-bold mt-0.5 inline-block">
-  Open Maps →
-</a>
-               
+                target="_blank" rel="noreferrer"
+                className="text-[9px] text-blue-500 hover:text-blue-700 font-bold mt-0.5 inline-block">
+                Open Maps →
+              </a>
             )}
           </div>
         </div>
       </td>
 
       {/* Image */}
-      <td className="px-4 py-3.5">
+      <td className="px-4 py-3.5 align-top">
         {issue.image
           ? <a href={issue.image} target="_blank" rel="noreferrer">
               <img src={issue.image} alt="Issue" className="w-12 h-12 rounded-lg object-cover border border-slate-200 hover:scale-110 transition-transform shadow-sm" />
@@ -228,7 +236,7 @@ function IssueRow({ issue, onUpdate, updating }) {
       </td>
 
       {/* Reporter */}
-      <td className="px-4 py-3.5">
+      <td className="px-4 py-3.5 align-top">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center flex-shrink-0">
             <span className="text-blue-700 text-[10px] font-black">{issue.name?.charAt(0).toUpperCase()}</span>
@@ -241,13 +249,14 @@ function IssueRow({ issue, onUpdate, updating }) {
       </td>
 
       {/* Priority */}
-      <td className="px-4 py-3.5">
+      <td className="px-4 py-3.5 align-top">
         <Badge className={`${pri.bg||"bg-slate-50"} ${pri.text||"text-slate-600"} ${pri.border||"border-slate-200"}`}>
           <Dot className={pri.dot||"bg-slate-400"} />{issue.priority||"—"}
         </Badge>
       </td>
 
-     <td className="px-4 py-3.5">
+      {/* AI Analysis */}
+      <td className="px-4 py-3.5 align-top">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5">
             <Badge className={`${aiCfg.bg} ${aiCfg.text} border-transparent`}>
@@ -284,9 +293,9 @@ function IssueRow({ issue, onUpdate, updating }) {
           )}
         </div>
       </td>
-    
+
       {/* Date */}
-      <td className="px-4 py-3.5 whitespace-nowrap">
+      <td className="px-4 py-3.5 whitespace-nowrap align-top">
         <div className="flex items-center gap-1 text-[11px] text-slate-500">
           <Calendar size={11} className="text-slate-400 flex-shrink-0" />
           {fmt(issue.createdAt)}
@@ -294,7 +303,7 @@ function IssueRow({ issue, onUpdate, updating }) {
       </td>
 
       {/* Status */}
-      <td className="px-4 py-3.5">
+      <td className="px-4 py-3.5 align-top">
         <div className="w-32">
           <StatusDropdown issueId={issue._id} currentStatus={issue.status} onUpdate={onUpdate} updating={updating} />
         </div>
