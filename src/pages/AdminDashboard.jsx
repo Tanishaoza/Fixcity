@@ -155,16 +155,23 @@ function StatusDropdown({ issueId, currentStatus, onUpdate, updating }) {
 }
 
 // ─── Issue Row ─────────────────────────────────────────────────────────────────
-// ─── Issue Row ─────────────────────────────────────────────────────────────────
 function IssueRow({ issue, onUpdate, updating }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const pri   = PRIORITY_CONFIG[issue.priority] || {};
   const aiCfg = AI_STATUS_CONFIG[issue.aiStatus || "Processing"] || AI_STATUS_CONFIG.Processing;
 
+  // Fake or placeholder handler for running the processing action again
+  const handleReverify = async (e) => {
+    e.stopPropagation(); // Stops the accordion drawer from opening/closing
+    alert(`Triggering background re-analysis for Issue: ${issue.issueId}`);
+    // You can replace this later with a fetch request to your backend:
+    // fetch(`${API_BASE}/issues/${issue._id}/reverify`, { method: "POST" })
+  };
+
   return (
     <tr className="hover:bg-slate-50/60 transition-colors group border-b border-slate-100 last:border-0">
 
-      {/* Issue Column - Now Clickable */}
+      {/* Issue */}
       <td className="px-4 py-3.5 align-top">
         <div 
           onClick={() => setIsExpanded(!isExpanded)}
@@ -183,16 +190,20 @@ function IssueRow({ issue, onUpdate, updating }) {
                 </span>
               </div>
             )}
+            
             <span className="text-[10px] font-medium text-slate-400 block mt-0.5 uppercase tracking-wider">
-  📁 {issue.category}
-</span>
-            <span className="text-[9px] font-bold text-blue-500 mt-1.5 flex items-center gap-1 opacity-60 group-hover/click:opacity-100 transition-opacity">
-              {isExpanded ? "▲ Hide Details" : "▼ Click to view Audit Log"}
+              📁 {issue.category}
             </span>
+            
+            {issue.aiReason && (
+              <span className="text-[9px] font-bold text-blue-500 mt-1.5 flex items-center gap-1 opacity-60 group-hover/click:opacity-100 transition-opacity">
+                {isExpanded ? "▲ Hide Details" : "▼ Click to view Audit Log"}
+              </span>
+            )}
 
             {/* EXPANDABLE CARD DRAWER */}
             {isExpanded && issue.aiReason && (
-              <div className="mt-2.5 p-2.5 bg-slate-50 border border-slate-200 border-l-4 border-l-blue-500 rounded-r-xl shadow-inner max-w-[240px] animate-fadeIn">
+              <div className="mt-2.5 p-2.5 bg-slate-50 border border-slate-200 border-l-4 border-l-blue-500 rounded-r-xl shadow-inner max-w-[240px]">
                 <p className="text-[9px] font-black text-blue-700 flex items-center gap-1 uppercase tracking-wider mb-1">
                   🛡️ Audit & Metadata Log
                 </p>
@@ -256,7 +267,7 @@ function IssueRow({ issue, onUpdate, updating }) {
         </Badge>
       </td>
 
-      {/* AI Analysis */}
+      {/* AI Analysis (FIXED WITH RETRY LAUNCHER) */}
       <td className="px-4 py-3.5 align-top">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5">
@@ -269,6 +280,7 @@ function IssueRow({ issue, onUpdate, updating }) {
             )}
           </div>
 
+          {/* If the state is Completed, display verification updates */}
           {issue.aiStatus === "Completed" && (
             <div className="flex flex-col gap-1 mt-0.5">
               {issue.verificationStatus === "Verified" && (
@@ -287,6 +299,16 @@ function IssueRow({ issue, onUpdate, updating }) {
                 </span>
               )}
             </div>
+          )}
+
+          {/* Action launcher added for Failed row targets */}
+          {issue.aiStatus === "Failed" && (
+            <button 
+              onClick={handleReverify}
+              className="text-[10px] font-black text-red-600 hover:text-red-800 transition-colors bg-red-50 border border-red-100 hover:bg-red-100/70 px-2 py-0.5 rounded-md w-fit text-left mt-0.5 cursor-pointer"
+            >
+              🔄 Re-run AI Analysis
+            </button>
           )}
 
           {issue.aiStatus === "Processing" && (
