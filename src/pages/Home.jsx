@@ -86,10 +86,10 @@ function Hero() {
           </p>
 
           <div className="flex flex-wrap gap-3">
-            <Link
-              to={isLoggedIn ? "/report" : "/login"}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl shadow-md hover:shadow-lg transition-all"
-            >
+           <Link
+  to={isAdmin ? "/admin" : isUser ? "/report" : "/login"}
+  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl shadow-md hover:shadow-lg transition-all"
+>
               <Icon d={icons.plus} size={16} />
               Report Issue
             </Link>
