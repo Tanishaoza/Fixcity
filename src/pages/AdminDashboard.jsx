@@ -183,8 +183,9 @@ function IssueRow({ issue, onUpdate, updating }) {
                 </span>
               </div>
             )}
-            <span className="text-[10px] text-slate-400 block mt-0.5">{issue.category}</span>
-            
+            <span className="text-[10px] font-medium text-slate-400 block mt-0.5 uppercase tracking-wider">
+  📁 {issue.category}
+</span>
             <span className="text-[9px] font-bold text-blue-500 mt-1.5 flex items-center gap-1 opacity-60 group-hover/click:opacity-100 transition-opacity">
               {isExpanded ? "▲ Hide Details" : "▼ Click to view Audit Log"}
             </span>
