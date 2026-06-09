@@ -8,7 +8,7 @@ import {
   Search, Filter, RefreshCw, MapPin, Calendar,
   Shield, ChevronDown, Loader2, InboxIcon, Building2,
   TrendingUp, Activity, BarChart3, Layers, Flame,
-  AlertTriangle, Wifi, WifiOff,
+  AlertTriangle, Wifi, WifiOff, FileText, ChevronRight,
 } from "lucide-react";
 
 const API_BASE = "https://fixcity-0wi0.onrender.com";
@@ -20,21 +20,23 @@ const STATUS_CONFIG = {
   Assigned:   { bg:"bg-sky-50",     text:"text-sky-700",     border:"border-sky-200",     dot:"bg-sky-400",     ring:"ring-sky-200"     },
   Resolved:   { bg:"bg-emerald-50", text:"text-emerald-700", border:"border-emerald-200", dot:"bg-emerald-400", ring:"ring-emerald-200" },
 };
-
 const PRIORITY_CONFIG = {
   Critical: { bg:"bg-red-50",     text:"text-red-700",     border:"border-red-200",     dot:"bg-red-500",     bar:"bg-red-500"     },
   Moderate: { bg:"bg-amber-50",   text:"text-amber-700",   border:"border-amber-200",   dot:"bg-amber-500",   bar:"bg-amber-500"   },
   Minor:    { bg:"bg-emerald-50", text:"text-emerald-700", border:"border-emerald-200", dot:"bg-emerald-500", bar:"bg-emerald-500" },
 };
-
 const AI_STATUS_CONFIG = {
   Processing: { bg:"bg-purple-50",  text:"text-purple-700",  dot:"bg-purple-400"  },
   Completed:  { bg:"bg-emerald-50", text:"text-emerald-700", dot:"bg-emerald-400" },
   Failed:     { bg:"bg-red-50",     text:"text-red-700",     dot:"bg-red-400"     },
 };
-
+const VERIF_CONFIG = {
+  Verified:   { bg:"bg-emerald-50", text:"text-emerald-700", border:"border-emerald-200", icon:"✓", label:"Verified"   },
+  Mismatch:   { bg:"bg-red-50",     text:"text-red-700",     border:"border-red-200",     icon:"✗", label:"Mismatch"   },
+  Suspicious: { bg:"bg-amber-50",   text:"text-amber-700",   border:"border-amber-200",   icon:"!", label:"Suspicious" },
+};
 const STAT_CARDS = [
-  { label:"Unique Issues", key:"total",    icon:LayoutDashboard, grad:"from-slate-700 to-slate-900",   soft:"bg-slate-50  border-slate-200",  val:"text-slate-800",  bar:"bg-slate-600"  },
+  { label:"Total Issues", key:"total",    icon:LayoutDashboard, grad:"from-slate-700 to-slate-900",   soft:"bg-slate-50  border-slate-200",  val:"text-slate-800",  bar:"bg-slate-600"  },
   { label:"Pending",      key:"pending",  icon:Clock,           grad:"from-amber-500 to-orange-600",  soft:"bg-amber-50  border-amber-100",  val:"text-amber-700",  bar:"bg-amber-500"  },
   { label:"In Review",    key:"inReview", icon:Activity,        grad:"from-violet-500 to-purple-700", soft:"bg-violet-50 border-violet-100", val:"text-violet-700", bar:"bg-violet-500" },
   { label:"Assigned",     key:"assigned", icon:UserCheck,       grad:"from-sky-500 to-blue-700",      soft:"bg-sky-50    border-sky-100",    val:"text-sky-700",    bar:"bg-sky-500"    },
@@ -43,7 +45,7 @@ const STAT_CARDS = [
 
 const cleanArea = (loc) => {
   if (!loc) return null;
-  if (loc.startsWith("GPS Location") || loc.startsWith("Current Location")) return "Auto-detected Area";
+  if (loc.startsWith("GPS") || loc.startsWith("Current")) return "Auto-detected";
   return loc;
 };
 const fmt = (d) => new Date(d).toLocaleDateString("en-IN",{ day:"numeric", month:"short", year:"numeric" });
@@ -52,374 +54,289 @@ const fmt = (d) => new Date(d).toLocaleDateString("en-IN",{ day:"numeric", month
 const mkIcon = (color) => L.divIcon({
   className:"", iconAnchor:[12,28], popupAnchor:[0,-30],
   html:`<div style="position:relative;width:24px;height:28px;">
-    <div style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:${color};opacity:.2;animation:pulse 2s infinite;"></div>
+    <div style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:${color};opacity:.2;animation:p 2s infinite;"></div>
     <svg width="24" height="28" viewBox="0 0 24 28" fill="none">
       <path d="M12 1C6.48 1 2 5.48 2 11c0 7 10 17 10 17s10-10 10-17c0-5.52-4.48-10-10-10z" fill="${color}" filter="drop-shadow(0 2px 4px ${color}88)"/>
       <circle cx="12" cy="11" r="4" fill="white" opacity=".9"/>
       <circle cx="12" cy="11" r="1.8" fill="${color}"/>
     </svg>
   </div>
-  <style>@keyframes pulse{0%,100%{transform:scale(.8);opacity:.2}50%{transform:scale(2);opacity:0}}</style>`
+  <style>@keyframes p{0%,100%{transform:scale(.8);opacity:.2}50%{transform:scale(2);opacity:0}}</style>`
 });
 const RED_ICON    = mkIcon("#ef4444");
 const YELLOW_ICON = mkIcon("#f59e0b");
 const GREEN_ICON  = mkIcon("#10b981");
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Components ───────────────────────────────────────────────────────────────
 function HeatLayer({ issues }) {
   const map = useMap();
   useEffect(() => {
-    const pts = issues.filter(i => i.latitude && i.longitude).map(i => [+i.latitude, +i.longitude, 0.7]);
+    const pts = issues.filter(i=>i.latitude&&i.longitude).map(i=>[+i.latitude,+i.longitude,0.7]);
     if (!pts.length) return;
-    const layer = L.heatLayer(pts, { radius:25, blur:15, maxZoom:17 }).addTo(map);
-    return () => map.removeLayer(layer);
-  }, [issues, map]);
+    const layer = L.heatLayer(pts,{radius:25,blur:15,maxZoom:17}).addTo(map);
+    return ()=>map.removeLayer(layer);
+  },[issues,map]);
   return null;
 }
 
-function Badge({ children, className="" }) {
-  return <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${className}`}>{children}</span>;
-}
 function Dot({ className="" }) {
-  return <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${className}`} />;
+  return <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${className}`}/>;
 }
 
 function StatCard({ label, value, icon:Icon, grad, soft, val, bar, total, isTotal }) {
-  const pct = total > 0 && !isTotal ? Math.round((value/total)*100) : 100;
+  const pct = total>0&&!isTotal ? Math.round((value/total)*100) : 100;
   return (
     <div className={`relative rounded-2xl border p-4 bg-white shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden ${soft}`}>
       <div className="flex items-start justify-between mb-3">
         <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center shadow-md`}>
-          <Icon size={17} className="text-white" strokeWidth={2} />
+          <Icon size={17} className="text-white" strokeWidth={2}/>
         </div>
-        {!isTotal && total > 0 && <span className={`text-xs font-black ${val}`}>{pct}%</span>}
+        {!isTotal&&total>0&&<span className={`text-xs font-black ${val}`}>{pct}%</span>}
       </div>
       <div className={`text-3xl font-black tracking-tight leading-none mb-0.5 ${val}`}>{value}</div>
       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">{label}</p>
       <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-1000 ${bar}`} style={{width:`${pct}%`}} />
+        <div className={`h-full rounded-full transition-all duration-1000 ${bar}`} style={{width:`${pct}%`}}/>
       </div>
     </div>
   );
 }
 
 function StatusDropdown({ issueId, currentStatus, onUpdate, updating }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const [pos, setPos] = useState({ top:0, left:0, width:0 });
-  const cfg = STATUS_CONFIG[currentStatus] || {};
-
-  const handleOpen = () => {
-    if (btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setPos({ top:r.bottom+4, left:r.left, width:Math.max(r.width,148) });
-    }
-    setOpen(o => !o);
+  const [open,setOpen]=useState(false);
+  const btnRef=useRef(null);
+  const [pos,setPos]=useState({top:0,left:0,width:0});
+  const cfg=STATUS_CONFIG[currentStatus]||{};
+  const handleOpen=()=>{
+    if(btnRef.current){const r=btnRef.current.getBoundingClientRect();setPos({top:r.bottom+4,left:r.left,width:Math.max(r.width,148)});}
+    setOpen(o=>!o);
   };
-
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("resize", close);
-    return () => { window.removeEventListener("scroll",close,true); window.removeEventListener("resize",close); };
-  }, [open]);
-
+  useEffect(()=>{
+    if(!open)return;
+    const close=()=>setOpen(false);
+    window.addEventListener("scroll",close,true); window.addEventListener("resize",close);
+    return()=>{window.removeEventListener("scroll",close,true);window.removeEventListener("resize",close);};
+  },[open]);
   return (
     <>
       <button ref={btnRef} onClick={handleOpen} disabled={updating}
         className={`w-full flex items-center justify-between text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-all focus:outline-none focus:ring-2 ${cfg.bg||"bg-slate-50"} ${cfg.text||"text-slate-600"} ${cfg.border||"border-slate-200"} ${cfg.ring||"ring-slate-200"}`}>
-        <span className="flex items-center gap-1.5">
-          <Dot className={cfg.dot||"bg-slate-300"} />{currentStatus}
-        </span>
-        {updating ? <Loader2 size={11} className="animate-spin" /> : <ChevronDown size={11} className={`transition-transform ${open?"rotate-180":""}`} />}
+        <span className="flex items-center gap-1.5"><Dot className={cfg.dot||"bg-slate-300"}/>{currentStatus}</span>
+        {updating?<Loader2 size={11} className="animate-spin"/>:<ChevronDown size={11} className={`transition-transform ${open?"rotate-180":""}`}/>}
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
-          <div className="fixed z-[9999] bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden py-1"
-            style={{top:pos.top, left:pos.left, width:pos.width}}>
-            {Object.entries(STATUS_CONFIG).map(([s,c]) => (
-              <button key={s} onClick={() => { setOpen(false); if (s!==currentStatus) onUpdate(issueId,s); }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-left transition-colors hover:bg-slate-50 ${s===currentStatus?"bg-slate-50":""}`}>
-                <Dot className={c.dot} />
-                <span className={s===currentStatus?c.text:"text-slate-600"}>{s}</span>
-                {s===currentStatus && <CheckCircle2 size={10} className={`ml-auto ${c.text}`} />}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      {open&&(<>
+        <div className="fixed inset-0 z-[9998]" onClick={()=>setOpen(false)}/>
+        <div className="fixed z-[9999] bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden py-1" style={{top:pos.top,left:pos.left,width:pos.width}}>
+          {Object.entries(STATUS_CONFIG).map(([s,c])=>(
+            <button key={s} onClick={()=>{setOpen(false);if(s!==currentStatus)onUpdate(issueId,s);}}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-left transition-colors hover:bg-slate-50 ${s===currentStatus?"bg-slate-50":""}`}>
+              <Dot className={c.dot}/><span className={s===currentStatus?c.text:"text-slate-600"}>{s}</span>
+              {s===currentStatus&&<CheckCircle2 size={10} className={`ml-auto ${c.text}`}/>}
+            </button>
+          ))}
+        </div>
+      </>)}
     </>
   );
 }
 
 // ─── Issue Row ─────────────────────────────────────────────────────────────────
 function IssueRow({ issue, onUpdate, updating }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const pri   = PRIORITY_CONFIG[issue.priority] || {};
-  const aiCfg = AI_STATUS_CONFIG[issue.aiStatus || "Processing"] || AI_STATUS_CONFIG.Processing;
-
-  // Fake or placeholder handler for running the processing action again
-  const handleReverify = async (e) => {
-    e.stopPropagation(); // Stops the accordion drawer from opening/closing
-    alert(`Triggering background re-analysis for Issue: ${issue.issueId}`);
-    // You can replace this later with a fetch request to your backend:
-    // fetch(`${API_BASE}/issues/${issue._id}/reverify`, { method: "POST" })
-  };
+  const [expanded, setExpanded] = useState(false);
+  const pri    = PRIORITY_CONFIG[issue.priority] || {};
+  const aiCfg  = AI_STATUS_CONFIG[issue.aiStatus||"Processing"] || AI_STATUS_CONFIG.Processing;
+  const verif  = VERIF_CONFIG[issue.verificationStatus];
 
   return (
-    <tr className="hover:bg-slate-50/60 transition-colors group border-b border-slate-100 last:border-0">
+    <>
+      <tr className="hover:bg-slate-50/70 transition-colors group border-b border-slate-100">
 
-      {/* Issue */}
-      <td className="px-4 py-3.5 align-top">
-        <div 
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-start gap-2.5 cursor-pointer select-none group/click"
-        >
-          <div className={`mt-1 w-1 h-8 rounded-full flex-shrink-0 ${pri.bar||"bg-slate-200"}`} />
-          <div className="min-w-0 flex-1">
-            <span className="text-[9px] font-bold text-slate-400 font-mono tracking-wider block">{issue.issueId}</span>
-            <span className="text-sm font-semibold text-slate-800 group-hover/click:text-blue-700 transition-colors block leading-snug truncate max-w-[180px]">
-              {issue.title}
-            </span>
-            {issue.duplicateCount > 1 && (
-              <div className="mt-1">
-                <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 text-[9px] font-bold px-2 py-0.5 rounded-full">
-                  🚨 {issue.duplicateCount} reports linked
-                </span>
+        {/* Issue */}
+        <td className="px-4 py-3">
+          <div className="flex items-start gap-2.5">
+            <div className={`mt-1.5 w-[3px] h-7 rounded-full flex-shrink-0 ${pri.bar||"bg-slate-200"}`}/>
+            <div className="min-w-0">
+              <span className="text-[9px] font-bold text-slate-400 font-mono tracking-wider block mb-0.5">{issue.issueId}</span>
+              <span className="text-[13px] font-bold text-slate-800 group-hover:text-blue-700 transition-colors block leading-snug max-w-[190px] truncate">{issue.title}</span>
+              <span className="text-[10px] text-slate-400 font-medium block mt-0.5">{issue.category}</span>
+              {issue.aiReason && (
+                <button onClick={()=>setExpanded(e=>!e)}
+                  className="flex items-center gap-0.5 text-[9px] text-blue-500 hover:text-blue-700 font-bold mt-1 transition-colors">
+                  <ChevronRight size={10} className={`transition-transform ${expanded?"rotate-90":""}`}/>
+                  {expanded ? "Hide audit log" : "View audit log"}
+                </button>
+              )}
+            </div>
+          </div>
+        </td>
+
+        {/* Location */}
+        <td className="px-4 py-3 max-w-[150px]">
+          <div className="flex items-start gap-1">
+            <MapPin size={11} className="text-blue-400 mt-0.5 flex-shrink-0"/>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium text-slate-700 leading-snug line-clamp-2">
+                {issue.location?.startsWith("GPS")?"Auto-detected":issue.location||"Unavailable"}
+              </p>
+              {issue.latitude&&issue.longitude&&(
+                <a href={`https://www.google.com/maps?q=${issue.latitude},${issue.longitude}`} target="_blank" rel="noreferrer"
+                  className="text-[9px] text-blue-500 hover:text-blue-700 font-bold mt-0.5 inline-block">Open Maps →</a>
+              )}
+            </div>
+          </div>
+        </td>
+
+        {/* Image */}
+        <td className="px-4 py-3">
+          {issue.image
+            ? <a href={issue.image} target="_blank" rel="noreferrer">
+                <img src={issue.image} alt="Issue" className="w-11 h-11 rounded-xl object-cover border border-slate-200 hover:scale-110 transition-transform shadow-sm"/>
+              </a>
+            : <div className="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center">
+                <span className="text-[8px] text-slate-400 font-semibold text-center leading-tight">No img</span>
               </div>
-            )}
-            
-            <span className="text-[10px] font-medium text-slate-400 block mt-0.5 uppercase tracking-wider">
-              📁 {issue.category}
-            </span>
-            
-            {issue.aiReason && (
-              <span className="text-[9px] font-bold text-blue-500 mt-1.5 flex items-center gap-1 opacity-60 group-hover/click:opacity-100 transition-opacity">
-                {isExpanded ? "▲ Hide Details" : "▼ Click to view Audit Log"}
+          }
+        </td>
+
+        {/* Reporter */}
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center flex-shrink-0">
+              <span className="text-blue-700 text-[10px] font-black">{issue.name?.charAt(0).toUpperCase()}</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold text-slate-800 truncate max-w-[100px]">{issue.name}</p>
+              <p className="text-[9px] text-slate-400 truncate max-w-[100px]">{issue.email}</p>
+            </div>
+          </div>
+        </td>
+
+        {/* Priority */}
+        <td className="px-4 py-3">
+          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${pri.bg||"bg-slate-50"} ${pri.text||"text-slate-600"} ${pri.border||"border-slate-200"}`}>
+            <Dot className={pri.dot||"bg-slate-400"}/>{issue.priority||"—"}
+          </span>
+        </td>
+
+        {/* AI Analysis — clean 3-line layout */}
+        <td className="px-4 py-3">
+          <div className="flex flex-col gap-1">
+
+            {/* Line 1: status + confidence */}
+            <div className="flex items-center gap-1.5">
+              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border-0 ${aiCfg.bg} ${aiCfg.text}`}>
+                <Dot className={aiCfg.dot}/>{issue.aiStatus||"Processing"}
+              </span>
+              {issue.aiConfidence>0&&(
+                <span className="text-[10px] font-black text-slate-500">{issue.aiConfidence}%</span>
+              )}
+            </div>
+
+            {/* Line 2: verification badge — only if completed */}
+            {verif&&issue.aiStatus==="Completed"&&(
+              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${verif.bg} ${verif.text} ${verif.border}`}>
+                {verif.icon} {verif.label}
+                {issue.matchScore>0&&<span className="opacity-60 font-semibold ml-0.5">({issue.matchScore}%)</span>}
               </span>
             )}
 
-            {/* EXPANDABLE CARD DRAWER */}
-            {isExpanded && issue.aiReason && (
-              <div className="mt-2.5 p-2.5 bg-slate-50 border border-slate-200 border-l-4 border-l-blue-500 rounded-r-xl shadow-inner max-w-[240px]">
-                <p className="text-[9px] font-black text-blue-700 flex items-center gap-1 uppercase tracking-wider mb-1">
-                  🛡️ Audit & Metadata Log
-                </p>
-                <p className="text-[10px] text-slate-600 font-medium leading-relaxed italic whitespace-pre-wrap">
-                  {issue.aiReason}
-                </p>
+            {/* Line 3: re-run button for failed */}
+            {issue.aiStatus==="Failed"&&(
+              <button className="text-[9px] font-bold text-red-600 hover:text-red-800 bg-red-50 border border-red-100 hover:bg-red-100 px-2 py-0.5 rounded-md w-fit transition-colors">
+                ↻ Re-run AI
+              </button>
+            )}
+          </div>
+        </td>
+
+        {/* Date */}
+        <td className="px-4 py-3 whitespace-nowrap">
+          <div className="flex items-center gap-1 text-[11px] text-slate-500">
+            <Calendar size={11} className="text-slate-400 flex-shrink-0"/>{fmt(issue.createdAt)}
+          </div>
+        </td>
+
+        {/* Status */}
+        <td className="px-4 py-3">
+          <div className="w-32">
+            <StatusDropdown issueId={issue._id} currentStatus={issue.status} onUpdate={onUpdate} updating={updating}/>
+          </div>
+        </td>
+      </tr>
+
+      {/* Expandable audit log row */}
+      {expanded&&issue.aiReason&&(
+        <tr className="bg-blue-50/40 border-b border-slate-100">
+          <td colSpan={8} className="px-6 py-3">
+            <div className="flex items-start gap-3">
+              <div className="w-1 self-stretch bg-blue-400 rounded-full flex-shrink-0"/>
+              <div>
+                <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-1">AI Audit Log · {issue.issueId}</p>
+                <p className="text-[11px] text-slate-600 leading-relaxed max-w-3xl">{issue.aiReason}</p>
               </div>
-            )}
-          </div>
-        </div>
-      </td>
-
-      {/* Location */}
-      <td className="px-4 py-3.5 max-w-[160px] align-top">
-        <div className="flex items-start gap-1">
-          <MapPin size={11} className="text-blue-400 mt-0.5 flex-shrink-0" />
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-slate-700 leading-snug line-clamp-2">
-              {issue.location?.startsWith("GPS") ? "Auto-detected" : issue.location || "Unavailable"}
-            </p>
-            {issue.latitude && issue.longitude && (
-              <a href={`https://www.google.com/maps?q=${issue.latitude},${issue.longitude}`}
-                target="_blank" rel="noreferrer"
-                className="text-[9px] text-blue-500 hover:text-blue-700 font-bold mt-0.5 inline-block">
-                Open Maps →
-              </a>
-            )}
-          </div>
-        </div>
-      </td>
-
-      {/* Image */}
-      <td className="px-4 py-3.5 align-top">
-        {issue.image
-          ? <a href={issue.image} target="_blank" rel="noreferrer">
-              <img src={issue.image} alt="Issue" className="w-12 h-12 rounded-lg object-cover border border-slate-200 hover:scale-110 transition-transform shadow-sm" />
-            </a>
-          : <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
-              <span className="text-[8px] text-slate-400 font-semibold text-center leading-tight px-1">No Image</span>
             </div>
-        }
-      </td>
-
-      {/* Reporter */}
-      <td className="px-4 py-3.5 align-top">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center flex-shrink-0">
-            <span className="text-blue-700 text-[10px] font-black">{issue.name?.charAt(0).toUpperCase()}</span>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold text-slate-800 truncate max-w-[100px]">{issue.name}</p>
-            <p className="text-[9px] text-slate-400 truncate max-w-[100px]">{issue.email}</p>
-          </div>
-        </div>
-      </td>
-
-      {/* Priority */}
-      <td className="px-4 py-3.5 align-top">
-        <Badge className={`${pri.bg||"bg-slate-50"} ${pri.text||"text-slate-600"} ${pri.border||"border-slate-200"}`}>
-          <Dot className={pri.dot||"bg-slate-400"} />{issue.priority||"—"}
-        </Badge>
-      </td>
-
-      {/* AI Analysis (FIXED WITH RETRY LAUNCHER) */}
-      <td className="px-4 py-3.5 align-top">
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-1.5">
-            <Badge className={`${aiCfg.bg} ${aiCfg.text} border-transparent`}>
-              <Dot className={aiCfg.dot} />
-              {issue.aiStatus || "Processing"}
-            </Badge>
-            {issue.aiConfidence > 0 && (
-              <span className="text-[10px] font-bold text-slate-400">{issue.aiConfidence}%</span>
-            )}
-          </div>
-
-          {/* If the state is Completed, display verification updates */}
-          {issue.aiStatus === "Completed" && (
-            <div className="flex flex-col gap-1 mt-0.5">
-              {issue.verificationStatus === "Verified" && (
-                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider w-fit">
-                  ✓ AI Verified ({issue.matchScore || 0}%)
-                </span>
-              )}
-              {issue.verificationStatus === "Suspicious" && (
-                <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider w-fit">
-                  ⚠️ Suspicious ({issue.matchScore || 0}%)
-                </span>
-              )}
-              {issue.verificationStatus === "Mismatch" && (
-                <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider w-fit">
-                  🚨 Mismatch ({issue.matchScore || 0}%)
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Action launcher added for Failed row targets */}
-          {issue.aiStatus === "Failed" && (
-            <button 
-              onClick={handleReverify}
-              className="text-[10px] font-black text-red-600 hover:text-red-800 transition-colors bg-red-50 border border-red-100 hover:bg-red-100/70 px-2 py-0.5 rounded-md w-fit text-left mt-0.5 cursor-pointer"
-            >
-              🔄 Re-run AI Analysis
-            </button>
-          )}
-
-          {issue.aiStatus === "Processing" && (
-            <span className="text-[9px] text-slate-400 font-medium italic">Evaluating data authenticity...</span>
-          )}
-        </div>
-      </td>
-
-      {/* Date */}
-      <td className="px-4 py-3.5 whitespace-nowrap align-top">
-        <div className="flex items-center gap-1 text-[11px] text-slate-500">
-          <Calendar size={11} className="text-slate-400 flex-shrink-0" />
-          {fmt(issue.createdAt)}
-        </div>
-      </td>
-
-      {/* Status */}
-      <td className="px-4 py-3.5 align-top">
-        <div className="w-32">
-          <StatusDropdown issueId={issue._id} currentStatus={issue.status} onUpdate={onUpdate} updating={updating} />
-        </div>
-      </td>
-    </tr>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const [issues,     setIssues]   = useState([]);
-  const [loading,    setLoading]  = useState(true);
-  const [error,      setError]    = useState(false);
-  const [search,     setSearch]   = useState("");
-  const [statusFilter, setStatus] = useState("Active");
-  const [updatingId, setUpdating] = useState(null);
-  const [lastSync,   setLastSync] = useState(new Date());
+  const [issues,setIssues]       = useState([]);
+  const [loading,setLoading]     = useState(true);
+  const [error,setError]         = useState(false);
+  const [search,setSearch]       = useState("");
+  const [statusFilter,setStatus] = useState("Active");
+  const [updatingId,setUpdating] = useState(null);
+  const [lastSync,setLastSync]   = useState(new Date());
 
   const fetchIssues = async () => {
     setLoading(true); setError(false);
     try {
       const token = localStorage.getItem("adminToken");
-      const res = await fetch(`${API_BASE}/issues`, {
-        signal: AbortSignal.timeout(8000),
-        headers: { "Authorization": `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error();
+      const res = await fetch(`${API_BASE}/issues`,{signal:AbortSignal.timeout(8000),headers:{"Authorization":`Bearer ${token}`}});
+      if(!res.ok) throw new Error();
       setIssues(await res.json());
     } catch { setIssues([]); setError(true); }
     finally { setLoading(false); setLastSync(new Date()); }
   };
-
-  useEffect(() => { fetchIssues(); }, []);
+  useEffect(()=>{fetchIssues();},[]);
 
   const handleStatusUpdate = async (id, newStatus) => {
-    const prev = issues.map(i => ({...i}));
+    const prev = issues.map(i=>({...i}));
     setUpdating(id);
     try {
       const token = localStorage.getItem("adminToken");
-      const res = await fetch(`${API_BASE}/issues/${id}/status`, {
-        method:"PATCH",
-        headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!res.ok) throw new Error();
+      const res = await fetch(`${API_BASE}/issues/${id}/status`,{method:"PATCH",headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},body:JSON.stringify({status:newStatus})});
+      if(!res.ok) throw new Error();
       const updated = await res.json();
-      setIssues(cur => cur.map(i => i._id === id ? updated : i));
+      setIssues(cur=>cur.map(i=>i._id===id?updated:i));
     } catch { setIssues(prev); }
     finally { setUpdating(null); }
   };
 
   const stats = {
     total:    issues.length,
-    pending:  issues.filter(i => i.status==="Pending").length,
-    inReview: issues.filter(i => i.status==="In Review").length,
-    assigned: issues.filter(i => i.status==="Assigned").length,
-    resolved: issues.filter(i => i.status==="Resolved").length,
+    pending:  issues.filter(i=>i.status==="Pending").length,
+    inReview: issues.filter(i=>i.status==="In Review").length,
+    assigned: issues.filter(i=>i.status==="Assigned").length,
+    resolved: issues.filter(i=>i.status==="Resolved").length,
   };
-// ─── 1. RUN THE FILTER & DEDUPLICATION PIPELINE FIRST ───
-  const filtered = issues.filter(issue => {
-  const q = search.toLowerCase();
 
-  const matchStatus =
-    statusFilter === "All" ||
-    (statusFilter === "Active" && issue.status !== "Resolved") ||
-    issue.status === statusFilter;
+  const filtered = issues.filter(issue=>{
+    const q=search.toLowerCase();
+    const matchStatus=statusFilter==="All"||(statusFilter==="Active"&&issue.status!=="Resolved")||issue.status===statusFilter;
+    const matchSearch=!q||[issue.issueId,issue.title,issue.category,issue.location,issue.name,issue.email].some(f=>f?.toLowerCase().includes(q));
+    return matchStatus&&matchSearch;
+  });
 
-  const matchSearch =
-    !q ||
-    [
-      issue.issueId,
-      issue.title,
-      issue.category,
-      issue.location,
-      issue.name,
-      issue.email,
-    ].some(f => f?.toLowerCase().includes(q));
-
-  return matchStatus && matchSearch;
-});
-
-  // ─── 2. CALCULATE METRICS DIRECTLY FROM WHAT IS VISIBLE ON SCREEN ───
-  // This makes sure the numbers perfectly match your 1 visible row!
-  const totalUniqueLocations = filtered.length; 
-  const totalRealReportsCount = filtered.reduce((sum, item) => sum + (item.duplicateCount || 1), 0);
-  const totalDuplicatesLinked = Math.max(0, totalRealReportsCount - totalUniqueLocations);
-
-  const activeCriticalCount = filtered.filter(item => item.priority === "Critical").length;
   const topAreas = Object.entries(
-    filtered.reduce((acc,i) => { const a=cleanArea(i.location); if(a) acc[a]=(acc[a]||0)+1; return acc; }, {})
+    filtered.reduce((acc,i)=>{const a=cleanArea(i.location);if(a)acc[a]=(acc[a]||0)+1;return acc;},{})
   ).sort((a,b)=>b[1]-a[1]).slice(0,3);
 
-  const resRate = stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0;
+  const resRate = stats.total>0?Math.round((stats.resolved/stats.total)*100):0;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -429,19 +346,19 @@ export default function AdminDashboard() {
         <div className="max-w-screen-xl mx-auto px-5 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-              <Building2 size={15} className="text-white" />
+              <Building2 size={15} className="text-white"/>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[15px] font-bold text-slate-900 tracking-tight">FixCity</span>
               <span className="hidden sm:inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">
-                <Shield size={8} /> Admin
+                <Shield size={8}/> Admin
               </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {error
-              ? <span className="flex items-center gap-1 text-red-500 text-[11px] font-semibold"><WifiOff size={12}/> Offline</span>
-              : <span className="hidden md:flex items-center gap-1 text-slate-400 text-[11px]"><Wifi size={11} className="text-emerald-400"/> Synced {lastSync.toLocaleTimeString()}</span>
+              ?<span className="flex items-center gap-1 text-red-500 text-[11px] font-semibold"><WifiOff size={12}/> Offline</span>
+              :<span className="hidden md:flex items-center gap-1 text-slate-400 text-[11px]"><Wifi size={11} className="text-emerald-400"/> Synced {lastSync.toLocaleTimeString()}</span>
             }
             <button onClick={fetchIssues} disabled={loading}
               className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm active:scale-95">
@@ -454,40 +371,33 @@ export default function AdminDashboard() {
       <main className="max-w-screen-xl mx-auto px-5 py-6 flex flex-col gap-6">
 
         {/* Banner */}
-        
-<div className="relative rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5 shadow-lg overflow-hidden">
-  <div className="absolute inset-0 opacity-10">
-    <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2"/>
-    <div className="absolute bottom-0 left-1/3 w-32 h-32 bg-white rounded-full translate-y-1/2"/>
-  </div>
-  <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-    <div>
-      <div className="flex items-center gap-2 mb-1.5">
-        <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"/>
-        <span className="text-blue-200 text-[10px] font-bold tracking-widest uppercase">System Live</span>
-      </div>
-      <h1 className="text-white text-lg font-black mb-1">Welcome back, Authority 👋</h1>
-      <p className="text-blue-200 text-sm">
-        <span className="text-white font-bold">{stats.pending} pending</span> and{" "}
-        <span className="text-white font-bold">{stats.inReview} in review</span> need your attention.
-      </p>
-    </div>
-    
-    {/* UPGRADED MATRIX ELEMENTS: Maps our new duplicate variables into cards */}
-    <div className="flex gap-2.5 flex-wrap">
-      {[
-        { label: "Total Reports", value: totalRealReportsCount, color: "text-blue-200" },
-        { label: "Unique Spots", value: totalUniqueLocations, color: "text-white" },
-        { label: "Duplicate Reports", value: `+${totalDuplicatesLinked}`, color: "text-amber-300" }
-      ].map(({ label, value, color }) => (
-        <div key={label} className="bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-center backdrop-blur-sm min-w-[100px]">
-          <div className={`text-2xl font-black ${color}`}>{value}</div>
-          <div className="text-[9px] text-blue-200 font-bold uppercase tracking-widest">{label}</div>
+        <div className="relative rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5 shadow-lg overflow-hidden">
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2"/>
+            <div className="absolute bottom-0 left-1/3 w-32 h-32 bg-white rounded-full translate-y-1/2"/>
+          </div>
+          <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"/>
+                <span className="text-blue-200 text-[10px] font-bold tracking-widest uppercase">System Live</span>
+              </div>
+              <h1 className="text-white text-lg font-black mb-1">Welcome back, Authority 👋</h1>
+              <p className="text-blue-200 text-sm">
+                <span className="text-white font-bold">{stats.pending} pending</span> and{" "}
+                <span className="text-white font-bold">{stats.inReview} in review</span> need your attention.
+              </p>
+            </div>
+            <div className="flex gap-2.5 flex-wrap">
+              {[{label:"Total",value:stats.total,c:"text-white"},{label:"Resolved",value:stats.resolved,c:"text-emerald-300"},{label:"Pending",value:stats.pending,c:"text-amber-300"}].map(({label,value,c})=>(
+                <div key={label} className="bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-center backdrop-blur-sm">
+                  <div className={`text-2xl font-black ${c}`}>{value}</div>
+                  <div className="text-[9px] text-blue-200 font-bold uppercase tracking-widest">{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-      ))}
-    </div>
-  </div>
-</div>
 
         {/* Stat Cards */}
         <section>
@@ -495,16 +405,8 @@ export default function AdminDashboard() {
             <BarChart3 size={12}/> Overview
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-  {STAT_CARDS.map(c => (
-    <StatCard 
-      key={c.key} 
-      {...c} 
-      value={c.key === "total" ? totalUniqueLocations : stats[c.key]} // <-- Use real total volume count here
-      total={totalRealReportsCount} 
-      isTotal={c.key === "total"}
-    />
-  ))}
-</div>
+            {STAT_CARDS.map(c=><StatCard key={c.key} {...c} value={stats[c.key]} total={stats.total} isTotal={c.key==="total"}/>)}
+          </div>
         </section>
 
         {/* Search + Filter */}
@@ -524,7 +426,7 @@ export default function AdminDashboard() {
             </select>
           </div>
           <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-[11px] font-semibold text-slate-500 whitespace-nowrap">
-            <TrendingUp size={12}/>{filtered.length} unique zones active
+            <TrendingUp size={12}/>{filtered.length} of {issues.length} issues
           </div>
         </div>
 
@@ -536,40 +438,38 @@ export default function AdminDashboard() {
             </h2>
             <div className="hidden sm:flex gap-2">
               {Object.entries(STATUS_CONFIG).map(([s,c])=>(
-                <Badge key={s} className={`${c.bg} ${c.text} ${c.border}`}>
+                <span key={s} className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${c.bg} ${c.text} ${c.border}`}>
                   <Dot className={c.dot}/>{s}: {issues.filter(i=>i.status===s).length}
-                </Badge>
+                </span>
               ))}
             </div>
           </div>
 
-          {loading ? (
+          {loading?(
             <div className="bg-white rounded-xl border border-slate-200 py-20 flex flex-col items-center gap-3 shadow-sm">
               <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
                 <Loader2 size={22} className="animate-spin text-blue-500"/>
               </div>
               <p className="font-semibold text-slate-700 text-sm">Loading civic reports…</p>
-              <p className="text-slate-400 text-xs">Connecting to FixCity server</p>
             </div>
-          ) : error ? (
+          ):error?(
             <div className="bg-red-50 rounded-xl border border-red-200 py-16 flex flex-col items-center gap-3">
               <AlertTriangle size={28} className="text-red-400"/>
               <p className="font-semibold text-red-700 text-sm">Could not load issues</p>
-              <p className="text-red-400 text-xs">Server may be starting up. Try refreshing in 30s.</p>
-              <button onClick={fetchIssues} className="mt-1 text-xs text-red-600 font-bold border border-red-200 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors">Try Again</button>
+              <p className="text-red-400 text-xs">Server may be starting up. Try again in 30s.</p>
+              <button onClick={fetchIssues} className="text-xs text-red-600 font-bold border border-red-200 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors">Try Again</button>
             </div>
-          ) : filtered.length === 0 ? (
+          ):filtered.length===0?(
             <div className="bg-white rounded-xl border border-slate-200 py-20 flex flex-col items-center gap-3 shadow-sm">
               <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
                 <InboxIcon size={20} className="text-slate-400"/>
               </div>
               <p className="font-semibold text-slate-700 text-sm">No issues found</p>
-              <p className="text-slate-400 text-xs">{search||statusFilter!=="All"?"Try adjusting your search or filter.":"No civic issues reported yet."}</p>
               {(search||statusFilter!=="All")&&(
                 <button onClick={()=>{setSearch("");setStatus("All");}} className="text-xs text-blue-600 font-bold border border-blue-200 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">Clear filters</button>
               )}
             </div>
-          ) : (
+          ):(
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[860px]">
@@ -581,14 +481,14 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-  {filtered.map(issue=>(
-    <IssueRow key={issue._id} issue={issue} onUpdate={handleStatusUpdate} updating={updatingId===issue._id}/>
-  ))}
-</tbody>
+                    {filtered.map(issue=>(
+                      <IssueRow key={issue._id} issue={issue} onUpdate={handleStatusUpdate} updating={updatingId===issue._id}/>
+                    ))}
+                  </tbody>
                 </table>
               </div>
               <div className="border-t border-slate-100 px-4 py-2.5 flex items-center justify-between">
-                <p className="text-[11px] text-slate-400">Showing {filtered.length} main row groups</p>
+                <p className="text-[11px] text-slate-400">Showing {filtered.length} of {issues.length} issues</p>
                 <p className="text-[11px] text-slate-400">Last synced: {lastSync.toLocaleTimeString()}</p>
               </div>
             </div>
@@ -636,10 +536,9 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col gap-4">
             <div>
               <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3"><Flame size={14} className="text-orange-500"/> Top Problem Areas</h3>
-              {topAreas.length===0?(
-                <p className="text-xs text-slate-400 text-center py-6">No location data available.</p>
-              ):(
-                <div className="flex flex-col gap-2">
+              {topAreas.length===0
+                ?<p className="text-xs text-slate-400 text-center py-6">No location data available.</p>
+                :<div className="flex flex-col gap-2">
                   {topAreas.map(([area,count],i)=>{
                     const cfgs=[
                       {bg:"bg-red-50",border:"border-red-100",text:"text-red-700",num:"from-red-500 to-rose-500"},
@@ -660,7 +559,7 @@ export default function AdminDashboard() {
                     );
                   })}
                 </div>
-              )}
+              }
             </div>
             <div className="border-t border-slate-100 pt-3 mt-auto">
               <div className="flex items-center justify-between mb-1.5">
